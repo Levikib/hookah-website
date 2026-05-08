@@ -1,4 +1,5 @@
 "use client";
+import AnimatedTitle from "./AnimatedTitle";
 import { useState } from "react";
 import { RENTAL_MODELS as RENTALS } from "@/data/rentals";
 import { useStore } from "@/store/useStore";
@@ -197,7 +198,7 @@ export default function RentalsSection() {
     <section
       id="rentals"
       style={{
-        background: "#030308",
+        background: "var(--nebula)",
         padding: "100px 0 120px",
         minHeight: "100vh",
         overflow: "hidden",
@@ -212,16 +213,20 @@ export default function RentalsSection() {
         }}>
           6 models · every style
         </p>
-        <h2 style={{
-          fontFamily: "var(--font-bebas)",
-          fontSize: "clamp(48px, 6vw, 80px)",
-          color: "#fff", letterSpacing: "0.04em",
-          textTransform: "uppercase", lineHeight: 0.95,
-        }}>
-          The Showroom.
-          <br />
-          <span style={{ color: "var(--purple)" }}>Pick Your Piece.</span>
-        </h2>
+        <AnimatedTitle
+          text={"The Showroom.\nPick Your Piece."}
+          as="h2"
+          start="top 85%"
+          style={{
+            fontSize: "clamp(48px, 6vw, 80px)",
+            lineHeight: 0.95,
+            letterSpacing: "0.04em",
+            color: "var(--text-primary)",
+          }}
+        />
+        <style>{`
+          .rentals-title div:last-child .animated-word { color: var(--violet-bright); }
+        `}</style>
       </div>
 
       {/* Horizontal carousel */}

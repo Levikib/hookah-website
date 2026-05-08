@@ -90,7 +90,7 @@ export default function DisassemblySection() {
   return (
     <section
       ref={sectionRef}
-      style={{ height: "400vh", background: "var(--black)" }}
+      style={{ height: "400vh", background: "var(--nebula)" }}
     >
       {/* Pinned viewport */}
       <div

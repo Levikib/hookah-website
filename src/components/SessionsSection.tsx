@@ -1,4 +1,5 @@
 "use client";
+import AnimatedTitle from "./AnimatedTitle";
 import { useState } from "react";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import { SESSIONS, CUSTOM_PRICING } from "@/data/sessions";
@@ -271,7 +272,7 @@ function CustomBuilder() {
 export default function SessionsSection() {
   const setBookingOpen = useStore((s) => s.setBookingOpen);
   return (
-    <section style={{ background: "var(--black)", padding: "100px 0 120px" }}>
+    <section style={{ background: "var(--nebula)", padding: "100px 0 120px" }}>
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 5vw" }}>
         <div style={{ textAlign: "center", marginBottom: 60 }}>
           <p style={{
@@ -281,15 +282,20 @@ export default function SessionsSection() {
           }}>
             8 tiers · every occasion
           </p>
-          <h2 style={{
-            fontFamily: "var(--font-bebas)",
-            fontSize: "clamp(48px, 6vw, 80px)",
-            color: "#fff", letterSpacing: "0.04em",
-            textTransform: "uppercase", lineHeight: 0.95,
-          }}>
-            Choose Your<br />
-            <span style={{ color: "var(--gold)" }}>Session.</span>
-          </h2>
+          <AnimatedTitle
+            text={"Choose Your\nSession."}
+            as="h2"
+            start="top 85%"
+            style={{
+              fontSize: "clamp(48px, 6vw, 80px)",
+              lineHeight: 0.95,
+              letterSpacing: "0.04em",
+              color: "var(--text-primary)",
+            }}
+          />
+          <style>{`
+            .sessions-title div:last-child .animated-word:last-child { color: var(--gold); }
+          `}</style>
         </div>
 
         <div style={{

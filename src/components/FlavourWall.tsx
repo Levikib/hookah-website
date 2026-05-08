@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import AnimatedTitle from "./AnimatedTitle";
 import { FLAVOURS, CATEGORIES, getStockStatus } from "@/data/flavours";
 import { useStore } from "@/store/useStore";
 
@@ -210,21 +211,21 @@ export default function FlavourWall() {
           >
             25 Premium Blends
           </p>
-          <h2
+          <AnimatedTitle
+            text={"The Flavour\nWall."}
+            as="h2"
+            start="top 85%"
             style={{
-              fontFamily: "var(--font-bebas)",
               fontSize: "clamp(48px, 6vw, 80px)",
-              color: "#fff",
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
               lineHeight: 0.95,
+              letterSpacing: "0.04em",
               marginBottom: 16,
+              color: "var(--text-primary)",
             }}
-          >
-            The Flavour
-            <br />
-            <span style={{ color: "var(--teal)" }}>Wall.</span>
-          </h2>
+          />
+          <style>{`
+            .animated-title div:last-child .animated-word:last-child { color: var(--cyan-bright); }
+          `}</style>
           <p
             style={{
               fontFamily: "var(--font-barlow)",
