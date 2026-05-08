@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FLAVOURS, CATEGORIES, getStockStatus } from "@/data/flavours";
 import { useStore } from "@/store/useStore";
 
@@ -83,9 +83,10 @@ interface ShopCardProps {
   flavour: typeof FLAVOURS[0];
   selectedSize: Size;
   onSizeChange: (size: Size) => void;
+  isMobile: boolean;
 }
 
-function ShopCard({ flavour, selectedSize, onSizeChange }: ShopCardProps) {
+function ShopCard({ flavour, selectedSize, onSizeChange, isMobile }: ShopCardProps) {
   const addToCart = useStore((s) => s.addToCart);
   const [adding, setAdding] = useState(false);
   const status = getStockStatus(flavour.stock);
@@ -129,7 +130,7 @@ function ShopCard({ flavour, selectedSize, onSizeChange }: ShopCardProps) {
       {/* Color gradient bar */}
       <div
         style={{
-          height: 60,
+          height: isMobile ? 40 : 60,
           background: `linear-gradient(to bottom, ${flavour.color}66, transparent)`,
           display: "flex",
           alignItems: "center",
@@ -137,7 +138,7 @@ function ShopCard({ flavour, selectedSize, onSizeChange }: ShopCardProps) {
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 40, lineHeight: 1 }}>{flavour.emoji}</span>
+        <span style={{ fontSize: isMobile ? 28 : 40, lineHeight: 1 }}>{flavour.emoji}</span>
       </div>
 
       {/* Card body */}
@@ -147,7 +148,7 @@ function ShopCard({ flavour, selectedSize, onSizeChange }: ShopCardProps) {
           <h3
             style={{
               fontFamily: "var(--font-bebas)",
-              fontSize: 22,
+              fontSize: isMobile ? 18 : 22,
               color: "var(--text-primary)",
               letterSpacing: "0.04em",
               lineHeight: 1,
@@ -203,6 +204,7 @@ function ShopCard({ flavour, selectedSize, onSizeChange }: ShopCardProps) {
               style={{
                 flex: 1,
                 padding: "5px 0",
+                minHeight: 36,
                 borderRadius: 6,
                 border: selectedSize === size
                   ? `1px solid ${flavour.color}`
@@ -212,7 +214,7 @@ function ShopCard({ flavour, selectedSize, onSizeChange }: ShopCardProps) {
                   : "rgba(255,255,255,0.04)",
                 color: selectedSize === size ? flavour.color : "rgba(255,255,255,0.45)",
                 fontFamily: "var(--font-mono)",
-                fontSize: 10,
+                fontSize: isMobile ? 11 : 13,
                 letterSpacing: "0.06em",
                 cursor: "pointer",
                 transition: "all 0.15s ease",
@@ -246,9 +248,10 @@ function ShopCard({ flavour, selectedSize, onSizeChange }: ShopCardProps) {
           className="btn-teal"
           style={{
             marginTop: "auto",
-            fontSize: 12,
+            fontSize: 13,
             letterSpacing: "0.12em",
             padding: "10px 0",
+            minHeight: 44,
             width: "100%",
             opacity: isOut ? 0.4 : 1,
             cursor: isOut ? "not-allowed" : "pointer",
@@ -265,6 +268,14 @@ function ShopCard({ flavour, selectedSize, onSizeChange }: ShopCardProps) {
 export default function FlavourShop() {
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [selectedSizes, setSelectedSizes] = useState<Record<number, Size>>({});
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const filtered =
     activeCategory === "All"
@@ -282,22 +293,24 @@ export default function FlavourShop() {
       id="shop"
       style={{
         background: "var(--void)",
-        padding: "120px 5vw 100px",
+        padding: "clamp(60px, 8vw, 120px) 5vw",
         position: "relative",
         overflow: "hidden",
       }}
     >
-      {/* Keyframe for pulsing badge */}
+      {/* Keyframe for pulsing badge + scrollbar hide */}
       <style>{`
         @keyframes pulse-badge {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.45; }
         }
+        .shop-filter-bar::-webkit-scrollbar { display: none; }
       `}</style>
 
       {/* Background accent orb */}
       <div
         style={{
+          display: isMobile ? "none" : "block",
           position: "absolute",
           width: 600,
           height: 600,
@@ -327,7 +340,7 @@ export default function FlavourShop() {
           <h2
             style={{
               fontFamily: "var(--font-bebas)",
-              fontSize: "clamp(52px, 6vw, 84px)",
+              fontSize: "clamp(40px, 6vw, 84px)",
               lineHeight: 0.92,
               letterSpacing: "0.02em",
               color: "var(--text-primary)",
@@ -339,51 +352,99 @@ export default function FlavourShop() {
         </div>
 
         {/* Filter bar */}
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 8,
-            marginBottom: 40,
-          }}
-        >
-          {CATEGORIES.map((cat) => {
-            const isActive = activeCategory === cat;
-            return (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 10,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  padding: "7px 16px",
-                  borderRadius: 6,
-                  border: isActive
-                    ? "1px solid var(--gold)"
-                    : "1px solid rgba(255,255,255,0.12)",
-                  background: isActive
-                    ? "rgba(245,158,11,0.12)"
-                    : "rgba(255,255,255,0.04)",
-                  color: isActive ? "var(--gold)" : "rgba(255,255,255,0.45)",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  boxShadow: isActive ? "0 0 12px rgba(245,158,11,0.2)" : "none",
-                }}
-              >
-                {cat}
-              </button>
-            );
-          })}
-        </div>
+        {isMobile ? (
+          <div
+            className="shop-filter-bar"
+            style={{
+              overflowX: "auto",
+              display: "flex",
+              gap: 8,
+              padding: "0 0 12px",
+              scrollbarWidth: "none",
+              WebkitOverflowScrolling: "touch",
+              marginBottom: 28,
+            } as React.CSSProperties}
+          >
+            {CATEGORIES.map((cat) => {
+              const isActive = activeCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  style={{
+                    flex: "0 0 auto",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    padding: "8px 16px",
+                    minHeight: 44,
+                    whiteSpace: "nowrap",
+                    borderRadius: 6,
+                    border: isActive
+                      ? "1px solid var(--gold)"
+                      : "1px solid rgba(255,255,255,0.12)",
+                    background: isActive
+                      ? "rgba(245,158,11,0.12)"
+                      : "rgba(255,255,255,0.04)",
+                    color: isActive ? "var(--gold)" : "rgba(255,255,255,0.45)",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    boxShadow: isActive ? "0 0 12px rgba(245,158,11,0.2)" : "none",
+                  }}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              marginBottom: 40,
+            }}
+          >
+            {CATEGORIES.map((cat) => {
+              const isActive = activeCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    padding: "7px 16px",
+                    borderRadius: 6,
+                    border: isActive
+                      ? "1px solid var(--gold)"
+                      : "1px solid rgba(255,255,255,0.12)",
+                    background: isActive
+                      ? "rgba(245,158,11,0.12)"
+                      : "rgba(255,255,255,0.04)",
+                    color: isActive ? "var(--gold)" : "rgba(255,255,255,0.45)",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    boxShadow: isActive ? "0 0 12px rgba(245,158,11,0.2)" : "none",
+                  }}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Product grid */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-            gap: 20,
+            gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(240px, 1fr))",
+            gap: isMobile ? 12 : 20,
           }}
         >
           {filtered.map((flavour) => (
@@ -392,6 +453,7 @@ export default function FlavourShop() {
               flavour={flavour}
               selectedSize={getSizeForFlavour(flavour.id)}
               onSizeChange={(size) => handleSizeChange(flavour.id, size)}
+              isMobile={isMobile}
             />
           ))}
         </div>

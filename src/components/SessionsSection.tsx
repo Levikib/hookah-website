@@ -1,6 +1,6 @@
 "use client";
+import React, { useState, useEffect } from "react";
 import AnimatedTitle from "./AnimatedTitle";
-import { useState } from "react";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import { SESSIONS, CUSTOM_PRICING } from "@/data/sessions";
 import { useStore } from "@/store/useStore";
@@ -16,7 +16,15 @@ const SESSION_EMOJIS: Record<string, string> = {
   custom: "🎨",
 };
 
-function SessionCard({ session, onBook }: { session: typeof SESSIONS[0]; onBook: () => void }) {
+function SessionCard({
+  session,
+  onBook,
+  isMobile,
+}: {
+  session: typeof SESSIONS[0];
+  onBook: () => void;
+  isMobile: boolean;
+}) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotateX = useTransform(y, [-80, 80], [8, -8]);
@@ -63,12 +71,12 @@ function SessionCard({ session, onBook }: { session: typeof SESSIONS[0]; onBook:
           </div>
         )}
 
-        <div style={{ fontSize: 36, marginBottom: 14, lineHeight: 1 }}>
+        <div style={{ fontSize: isMobile ? 28 : 36, marginBottom: 14, lineHeight: 1 }}>
           {SESSION_EMOJIS[session.id] ?? "🌿"}
         </div>
 
         <h3 style={{
-          fontFamily: "var(--font-bebas)", fontSize: 28,
+          fontFamily: "var(--font-bebas)", fontSize: isMobile ? 22 : 28,
           color: "#fff", letterSpacing: "0.04em",
           textTransform: "uppercase", marginBottom: 6, lineHeight: 1,
         }}>
@@ -127,7 +135,7 @@ function SessionCard({ session, onBook }: { session: typeof SESSIONS[0]; onBook:
 
         {!session.isCustom && (
           <p style={{
-            fontFamily: "var(--font-mono)", fontSize: 26,
+            fontFamily: "var(--font-mono)", fontSize: isMobile ? 22 : 26,
             color: accent, fontWeight: 700, marginBottom: 20,
           }}>
             ${session.price.toFixed(2)}
@@ -145,7 +153,7 @@ function SessionCard({ session, onBook }: { session: typeof SESSIONS[0]; onBook:
         <button
           onClick={onBook}
           className="btn-teal"
-          style={{ width: "100%", fontSize: 14 }}
+          style={{ width: "100%", fontSize: 14, minHeight: 44 }}
         >
           {session.isCustom ? "Get a Quote" : "Book Now"}
         </button>
@@ -154,7 +162,7 @@ function SessionCard({ session, onBook }: { session: typeof SESSIONS[0]; onBook:
   );
 }
 
-function CustomBuilder() {
+function CustomBuilder({ isMobile }: { isMobile: boolean }) {
   const [hookahs, setHookahs] = useState(1);
   const [people, setPeople] = useState(4);
   const [flavours, setFlavours] = useState(2);
@@ -182,11 +190,15 @@ function CustomBuilder() {
   ];
 
   return (
-    <div className="glass" style={{
-      padding: "40px 36px",
-      borderTop: "2px solid var(--teal)",
-      maxWidth: 680, margin: "64px auto 0",
-    }}>
+    <div
+      className="glass"
+      style={{
+        padding: isMobile ? "28px 20px" : "40px 36px",
+        borderTop: "2px solid var(--teal)",
+        maxWidth: isMobile ? "100%" : 680,
+        margin: isMobile ? "40px 5vw 0" : "64px auto 0",
+      }}
+    >
       <h3 style={{
         fontFamily: "var(--font-bebas)", fontSize: 36,
         color: "#fff", letterSpacing: "0.04em",
@@ -215,7 +227,7 @@ function CustomBuilder() {
             <input
               type="range" min={min} max={max} value={value}
               onChange={(e) => set(Number(e.target.value))}
-              style={{ width: "100%", accentColor: "var(--teal)", height: 4, cursor: "pointer" }}
+              style={{ width: "100%", accentColor: "var(--teal)", height: 8, cursor: "pointer" }}
             />
           </div>
         ))}
@@ -230,7 +242,9 @@ function CustomBuilder() {
               onClick={() => set(!val)}
               style={{
                 fontFamily: "var(--font-barlow)", fontWeight: 600, fontSize: 13,
-                padding: "8px 20px", borderRadius: 8,
+                padding: "10px 16px",
+                minHeight: 44,
+                borderRadius: 8,
                 border: val ? "1px solid var(--teal)" : "1px solid rgba(255,255,255,0.15)",
                 background: val ? "rgba(0,245,212,0.12)" : "rgba(255,255,255,0.04)",
                 color: val ? "var(--teal)" : "rgba(255,255,255,0.5)",
@@ -248,6 +262,7 @@ function CustomBuilder() {
         background: "rgba(0,245,212,0.06)",
         borderRadius: 12, border: "1px solid rgba(0,245,212,0.2)",
         display: "flex", justifyContent: "space-between", alignItems: "center",
+        flexWrap: "wrap", gap: 16,
       }}>
         <div>
           <p style={{
@@ -257,11 +272,15 @@ function CustomBuilder() {
           }}>
             Estimated Total
           </p>
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 36, color: "#fff", fontWeight: 700 }}>
+          <p style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: isMobile ? "clamp(28px, 6vw, 36px)" : 36,
+            color: "#fff", fontWeight: 700,
+          }}>
             ${total.toFixed(2)}
           </p>
         </div>
-        <button className="btn-teal" style={{ fontSize: 14 }}>
+        <button className="btn-teal" style={{ fontSize: 14, minHeight: 44 }}>
           Request Quote
         </button>
       </div>
@@ -271,8 +290,17 @@ function CustomBuilder() {
 
 export default function SessionsSection() {
   const setBookingOpen = useStore((s) => s.setBookingOpen);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   return (
-    <section style={{ background: "var(--nebula)", padding: "100px 0 120px" }}>
+    <section style={{ background: "var(--nebula)", padding: "clamp(60px, 8vw, 100px) 0" }}>
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 5vw" }}>
         <div style={{ textAlign: "center", marginBottom: 60 }}>
           <p style={{
@@ -287,7 +315,7 @@ export default function SessionsSection() {
             as="h2"
             start="top 85%"
             style={{
-              fontSize: "clamp(48px, 6vw, 80px)",
+              fontSize: "clamp(40px, 6vw, 80px)",
               lineHeight: 0.95,
               letterSpacing: "0.04em",
               color: "var(--text-primary)",
@@ -300,15 +328,15 @@ export default function SessionsSection() {
 
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+          gridTemplateColumns: isMobile ? "repeat(1, 1fr)" : "repeat(auto-fill, minmax(280px, 1fr))",
           gap: 20,
         }}>
           {SESSIONS.filter((s) => !s.isCustom).map((s) => (
-            <SessionCard key={s.id} session={s} onBook={() => setBookingOpen(true)} />
+            <SessionCard key={s.id} session={s} onBook={() => setBookingOpen(true)} isMobile={isMobile} />
           ))}
         </div>
 
-        <CustomBuilder />
+        <CustomBuilder isMobile={isMobile} />
       </div>
     </section>
   );

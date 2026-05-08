@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-function StarField() {
+function StarField({ height }: { height: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -102,11 +102,22 @@ const FOOTER_LINKS = {
 };
 
 export default function Footer() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  const starfieldHeight = isMobile ? 200 : 360;
+
   return (
     <footer style={{ background: "#020205", position: "relative", overflow: "hidden" }}>
       {/* Starfield outro */}
-      <div style={{ position: "relative", height: 360, overflow: "hidden" }}>
-        <StarField />
+      <div style={{ position: "relative", height: starfieldHeight, overflow: "hidden" }}>
+        <StarField height={starfieldHeight} />
         <div
           style={{
             position: "absolute",
@@ -151,22 +162,23 @@ export default function Footer() {
       <div
         style={{
           maxWidth: 1280, margin: "0 auto",
-          padding: "60px 5vw 40px",
+          padding: `clamp(60px, 8vw, 100px) 5vw 40px`,
           borderTop: "1px solid rgba(255,255,255,0.06)",
         }}
       >
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "2fr repeat(4, 1fr)",
+            gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "2fr repeat(4, 1fr)",
             gap: 40,
             marginBottom: 48,
           }}
         >
           {/* Brand column */}
-          <div>
+          <div style={isMobile ? { gridColumn: "1 / -1" } : {}}>
             <h3 style={{
-              fontFamily: "var(--font-bebas)", fontSize: 32,
+              fontFamily: "var(--font-bebas)",
+              fontSize: "clamp(24px, 5vw, 32px)",
               color: "#fff", letterSpacing: "0.08em",
               textTransform: "uppercase", marginBottom: 12,
             }}>
@@ -179,16 +191,27 @@ export default function Footer() {
             }}>
               Premium hookah experiences, curated flavours, and luxury rentals — wherever the vibe takes you.
             </p>
-            <div style={{ display: "flex", gap: 12 }}>
+            <p style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "clamp(10px, 2vw, 12px)",
+              color: "rgba(255,255,255,0.25)",
+              letterSpacing: "0.08em",
+              marginBottom: 16,
+            }}>
+              Made with smoke and obsession
+            </p>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               {["Instagram", "TikTok", "X"].map((s) => (
                 <button key={s} style={{
-                  fontFamily: "var(--font-mono)", fontSize: 10,
+                  fontFamily: "var(--font-mono)",
+                  fontSize: isMobile ? 11 : 12,
                   letterSpacing: "0.1em", textTransform: "uppercase",
                   color: "rgba(255,255,255,0.4)",
                   border: "1px solid rgba(255,255,255,0.12)",
-                  padding: "6px 12px", borderRadius: 6,
+                  padding: "10px 14px", borderRadius: 6,
                   background: "none", cursor: "pointer",
                   transition: "color 0.2s, border-color 0.2s",
+                  minHeight: 44,
                 }}>
                   {s}
                 </button>
@@ -215,6 +238,9 @@ export default function Footer() {
                       color: "rgba(255,255,255,0.5)",
                       textDecoration: "none",
                       transition: "color 0.2s",
+                      display: "block",
+                      padding: "8px 0",
+                      minHeight: 44,
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.color = "var(--teal)")}
                     onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.5)")}
@@ -231,7 +257,7 @@ export default function Footer() {
         {/* Bottom bar */}
         <div style={{
           borderTop: "1px solid rgba(255,255,255,0.06)",
-          paddingTop: 24,
+          padding: isMobile ? "20px 5vw" : "24px 5vw",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -239,15 +265,17 @@ export default function Footer() {
           gap: 12,
         }}>
           <p style={{
-            fontFamily: "var(--font-mono)", fontSize: 11,
+            fontFamily: "var(--font-mono)",
+            fontSize: "clamp(10px, 2vw, 12px)",
             color: "rgba(255,255,255,0.25)", letterSpacing: "0.08em",
           }}>
             © 2024 Hookah™ · All rights reserved
           </p>
-          <div style={{ display: "flex", gap: 24 }}>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
             {["Privacy Policy", "Terms of Service", "Cookie Policy"].map((t) => (
               <a key={t} href="#" style={{
-                fontFamily: "var(--font-mono)", fontSize: 10,
+                fontFamily: "var(--font-mono)",
+                fontSize: "clamp(10px, 2vw, 12px)",
                 color: "rgba(255,255,255,0.25)", letterSpacing: "0.08em",
                 textDecoration: "none",
               }}>

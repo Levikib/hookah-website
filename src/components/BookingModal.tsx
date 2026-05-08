@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useStore } from "@/store/useStore";
 import { SESSIONS } from "@/data/sessions";
 import { FLAVOURS } from "@/data/flavours";
@@ -59,23 +59,32 @@ function StepIndicator({ step }: { step: number }) {
           const isFuture    = num > step;
           return (
             <div key={num} style={{ display: "flex", alignItems: "center" }}>
+              {/* 44px touch target wrapper around 32px circle */}
               <div style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
+                width: 44,
+                height: 44,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontFamily: "var(--font-mono)",
-                fontSize: 12,
-                fontWeight: 700,
-                transition: "all 0.3s ease",
-                background:   isCompleted ? "var(--violet)"  : isActive ? "var(--cyan)" : "transparent",
-                border:       isFuture    ? "2px solid rgba(255,255,255,0.2)" : "none",
-                color:        isCompleted || isActive ? "#05030a" : "rgba(255,255,255,0.35)",
-                boxShadow:    isActive ? "0 0 16px rgba(6,182,212,0.6)" : "none",
               }}>
-                {isCompleted ? "✓" : num}
+                <div style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  transition: "all 0.3s ease",
+                  background:   isCompleted ? "var(--violet)"  : isActive ? "var(--cyan)" : "transparent",
+                  border:       isFuture    ? "2px solid rgba(255,255,255,0.2)" : "none",
+                  color:        isCompleted || isActive ? "#05030a" : "rgba(255,255,255,0.35)",
+                  boxShadow:    isActive ? "0 0 16px rgba(6,182,212,0.6)" : "none",
+                }}>
+                  {isCompleted ? "✓" : num}
+                </div>
               </div>
               {i < labels.length - 1 && (
                 <div style={{
@@ -105,7 +114,7 @@ function StepIndicator({ step }: { step: number }) {
 }
 
 // ── STEP 1: Session Selection ────────────────────────────────────────────────
-function Step1Session() {
+function Step1Session({ isMobile }: { isMobile: boolean }) {
   const { booking, setBookingSession } = useStore();
   const selected = booking.session;
 
@@ -126,7 +135,7 @@ function Step1Session() {
 
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+        gridTemplateColumns: isMobile ? "repeat(1, 1fr)" : "repeat(auto-fill, minmax(220px, 1fr))",
         gap: 14,
       }}>
         {SESSIONS.map((s) => {
@@ -219,7 +228,7 @@ function Step1Session() {
 }
 
 // ── STEP 2: Calendar / Time / Location ──────────────────────────────────────
-function Step2DateTime() {
+function Step2DateTime({ isMobile }: { isMobile: boolean }) {
   const {
     booking,
     setBookingDate,
@@ -277,7 +286,7 @@ function Step2DateTime() {
         Choose when and where the session happens.
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 24 }}>
         {/* ── Calendar ── */}
         <div style={{
           background: "rgba(255,255,255,0.03)",
@@ -368,6 +377,7 @@ function Step2DateTime() {
                     fontFamily: "var(--font-mono)",
                     fontSize: 11,
                     padding: "6px 0",
+                    minHeight: 44,
                     textAlign: "center",
                     cursor: isPast ? "none" : "none",
                     transition: "all 0.15s",
@@ -426,13 +436,16 @@ function Step2DateTime() {
                       borderRadius: 999,
                       color: isActive ? "#05030a" : "var(--text-primary)",
                       fontFamily: "var(--font-mono)",
-                      fontSize: 12,
-                      padding: "7px 16px",
+                      fontSize: 13,
+                      padding: "0 16px",
+                      minHeight: 44,
                       cursor: "none",
                       transition: "all 0.2s",
                       whiteSpace: "nowrap",
                       boxShadow: isActive ? "0 0 12px rgba(6,182,212,0.4)" : "none",
                       fontWeight: isActive ? 700 : 400,
+                      display: "flex",
+                      alignItems: "center",
                     }}
                   >
                     {slot}
@@ -512,7 +525,7 @@ function Step2DateTime() {
 }
 
 // ── STEP 3: Flavour Selection ────────────────────────────────────────────────
-function Step3Flavours() {
+function Step3Flavours({ isMobile }: { isMobile: boolean }) {
   const { booking, toggleFlavour } = useStore();
   const session = booking.session;
 
@@ -561,7 +574,7 @@ function Step3Flavours() {
 
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+        gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(160px, 1fr))",
         gap: 10,
         maxHeight: "58vh",
         overflowY: "auto",
@@ -643,7 +656,7 @@ function Step3Flavours() {
 }
 
 // ── STEP 4: Review & Confirm ─────────────────────────────────────────────────
-function Step4Review({ onConfirm }: { onConfirm: (ref: string) => void }) {
+function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void; isMobile: boolean }) {
   const {
     booking,
     setPromoCode,
@@ -669,6 +682,10 @@ function Step4Review({ onConfirm }: { onConfirm: (ref: string) => void }) {
     onConfirm(ref);
   };
 
+  // suppress unused var warnings
+  void resetBooking;
+  void setBookingOpen;
+
   return (
     <div>
       <h2 style={{
@@ -684,7 +701,7 @@ function Step4Review({ onConfirm }: { onConfirm: (ref: string) => void }) {
         Double-check everything before we lock it in.
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
         {/* ── Left: Order details ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Session block */}
@@ -848,7 +865,7 @@ function Step4Review({ onConfirm }: { onConfirm: (ref: string) => void }) {
             </div>
             {booking.promoCode && (
               <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--cyan)", marginTop: 8 }}>
-                Code "{booking.promoCode}" applied ✓
+                Code &quot;{booking.promoCode}&quot; applied ✓
               </p>
             )}
           </div>
@@ -860,7 +877,7 @@ function Step4Review({ onConfirm }: { onConfirm: (ref: string) => void }) {
             style={{
               width: "100%",
               fontFamily: "var(--font-bebas)",
-              fontSize: 22,
+              fontSize: "clamp(18px, 4vw, 22px)",
               letterSpacing: "0.1em",
               padding: "18px 0",
               borderRadius: 12,
@@ -973,6 +990,15 @@ export default function BookingModal() {
   const [confirmed, setConfirmed] = useState(false);
   const [refNum, setRefNum] = useState("");
 
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   const step = booking.step;
 
   if (!bookingOpen) return null;
@@ -1012,6 +1038,62 @@ export default function BookingModal() {
     4: "Review & Confirm",
   };
 
+  // Responsive padding
+  const innerPadding = isMobile ? "20px 20px" : "36px 40px";
+
+  // Mobile panel: bottom sheet style
+  const panelStyle: React.CSSProperties = isMobile
+    ? {
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        width: "100%",
+        maxWidth: "100%",
+        maxHeight: "100%",
+        overflowY: "auto",
+        background: "rgba(13,10,30,0.97)",
+        border: "1px solid rgba(124,58,237,0.3)",
+        borderRadius: "20px 20px 0 0",
+        boxShadow: "0 24px 64px rgba(0,0,0,0.8), 0 0 0 1px rgba(124,58,237,0.15), inset 0 1px 0 rgba(232,121,249,0.06)",
+        padding: innerPadding,
+        pointerEvents: "all",
+      }
+    : {
+        position: "relative",
+        width: "90vw",
+        maxWidth: 900,
+        maxHeight: "90vh",
+        overflowY: "auto",
+        background: "rgba(13,10,30,0.97)",
+        border: "1px solid rgba(124,58,237,0.3)",
+        borderRadius: 20,
+        boxShadow: "0 24px 64px rgba(0,0,0,0.8), 0 0 0 1px rgba(124,58,237,0.15), inset 0 1px 0 rgba(232,121,249,0.06)",
+        padding: innerPadding,
+        pointerEvents: "all",
+      };
+
+  const outerStyle: React.CSSProperties = isMobile
+    ? {
+        position: "fixed",
+        inset: 0,
+        zIndex: 101,
+        display: "flex",
+        alignItems: "flex-end",
+        justifyContent: "stretch",
+        pointerEvents: "none",
+      }
+    : {
+        position: "fixed",
+        inset: 0,
+        zIndex: 101,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "16px",
+        pointerEvents: "none",
+      };
+
   return (
     <>
       {/* Overlay */}
@@ -1030,41 +1112,18 @@ export default function BookingModal() {
       {/* Modal panel */}
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 101,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "16px",
-          pointerEvents: "none",
-        }}
+        style={outerStyle}
       >
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 900,
-            maxHeight: "92vh",
-            overflowY: "auto",
-            background: "rgba(13,10,30,0.97)",
-            border: "1px solid rgba(124,58,237,0.3)",
-            borderRadius: 20,
-            boxShadow: "0 24px 64px rgba(0,0,0,0.8), 0 0 0 1px rgba(124,58,237,0.15), inset 0 1px 0 rgba(232,121,249,0.06)",
-            padding: "36px 40px",
-            position: "relative",
-            pointerEvents: "all",
-          }}
-        >
-          {/* Close button */}
+        <div style={panelStyle}>
+          {/* Close button — 44x44 touch target */}
           <button
             onClick={handleClose}
             style={{
               position: "absolute",
-              top: 18,
-              right: 20,
-              width: 36,
-              height: 36,
+              top: isMobile ? 12 : 18,
+              right: isMobile ? 12 : 20,
+              width: 44,
+              height: 44,
               background: "rgba(255,255,255,0.06)",
               border: "1px solid rgba(255,255,255,0.12)",
               borderRadius: "50%",
@@ -1091,10 +1150,10 @@ export default function BookingModal() {
 
               {/* Step content */}
               <div style={{ minHeight: 320 }}>
-                {step === 1 && <Step1Session />}
-                {step === 2 && <Step2DateTime />}
-                {step === 3 && <Step3Flavours />}
-                {step === 4 && <Step4Review onConfirm={handleConfirm} />}
+                {step === 1 && <Step1Session isMobile={isMobile} />}
+                {step === 2 && <Step2DateTime isMobile={isMobile} />}
+                {step === 3 && <Step3Flavours isMobile={isMobile} />}
+                {step === 4 && <Step4Review onConfirm={handleConfirm} isMobile={isMobile} />}
               </div>
 
               {/* Navigation footer */}
@@ -1103,8 +1162,8 @@ export default function BookingModal() {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  marginTop: 32,
-                  paddingTop: 24,
+                  marginTop: isMobile ? 20 : 32,
+                  paddingTop: isMobile ? 16 : 24,
                   borderTop: "1px solid rgba(255,255,255,0.06)",
                 }}>
                   <button
@@ -1115,6 +1174,7 @@ export default function BookingModal() {
                       opacity: step === 1 ? 0 : 1,
                       pointerEvents: step === 1 ? "none" : "auto",
                       fontSize: 13,
+                      minHeight: 44,
                     }}
                   >
                     ← Back
@@ -1137,6 +1197,7 @@ export default function BookingModal() {
                     style={{
                       opacity: canGoNext ? 1 : 0.35,
                       fontSize: 13,
+                      minHeight: 44,
                     }}
                   >
                     Next →

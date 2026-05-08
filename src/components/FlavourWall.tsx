@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AnimatedTitle from "./AnimatedTitle";
 import { FLAVOURS, CATEGORIES, getStockStatus } from "@/data/flavours";
 import { useStore } from "@/store/useStore";
@@ -32,7 +32,7 @@ function StockBadge({ stock }: { stock: number }) {
   );
 }
 
-function FlavourCard({ flavour }: { flavour: typeof FLAVOURS[0] }) {
+function FlavourCard({ flavour, isMobile }: { flavour: typeof FLAVOURS[0]; isMobile: boolean }) {
   const [adding, setAdding] = useState(false);
   const addToCart = useStore((s) => s.addToCart);
   const status = getStockStatus(flavour.stock);
@@ -51,23 +51,25 @@ function FlavourCard({ flavour }: { flavour: typeof FLAVOURS[0] }) {
     setTimeout(() => setAdding(false), 800);
   };
 
+  const visibleNotes = isMobile ? flavour.notes.slice(0, 2) : flavour.notes.slice(0, 3);
+
   return (
     <div
       className="glass glass-hover"
       style={{
-        padding: "20px 18px",
+        padding: isMobile ? "14px 12px" : "20px 18px",
         opacity: isOut ? 0.5 : 1,
         cursor: isOut ? "not-allowed" : "default",
         display: "flex",
         flexDirection: "column",
-        gap: 10,
+        gap: isMobile ? 8 : 10,
         minHeight: 200,
         border: `1px solid ${isOut ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.12)"}`,
       }}
     >
       {/* Emoji + stock badge */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <span style={{ fontSize: 36, lineHeight: 1 }}>{flavour.emoji}</span>
+        <span style={{ fontSize: isMobile ? 32 : 48, lineHeight: 1 }}>{flavour.emoji}</span>
         <StockBadge stock={flavour.stock} />
       </div>
 
@@ -75,7 +77,7 @@ function FlavourCard({ flavour }: { flavour: typeof FLAVOURS[0] }) {
       <h3
         style={{
           fontFamily: "var(--font-bebas)",
-          fontSize: 22,
+          fontSize: isMobile ? "clamp(16px, 4vw, 22px)" : 28,
           color: "#fff",
           letterSpacing: "0.04em",
           textTransform: "uppercase",
@@ -114,7 +116,7 @@ function FlavourCard({ flavour }: { flavour: typeof FLAVOURS[0] }) {
 
       {/* Flavour notes */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {flavour.notes.slice(0, 3).map((note) => (
+        {visibleNotes.map((note) => (
           <span
             key={note}
             style={{
@@ -152,10 +154,11 @@ function FlavourCard({ flavour }: { flavour: typeof FLAVOURS[0] }) {
           style={{
             fontFamily: "var(--font-barlow)",
             fontWeight: 700,
-            fontSize: 11,
+            fontSize: isMobile ? 11 : 11,
             letterSpacing: "0.1em",
             textTransform: "uppercase",
-            padding: "7px 14px",
+            padding: isMobile ? "8px 14px" : "7px 14px",
+            minHeight: 44,
             borderRadius: 8,
             border: isOut
               ? "1px solid rgba(255,255,255,0.1)"
@@ -180,6 +183,14 @@ function FlavourCard({ flavour }: { flavour: typeof FLAVOURS[0] }) {
 
 export default function FlavourWall() {
   const [activeCategory, setActiveCategory] = useState("All");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const filtered = activeCategory === "All"
     ? FLAVOURS
@@ -191,10 +202,14 @@ export default function FlavourWall() {
     <section
       style={{
         background: "#050505",
-        padding: "100px 0 120px",
+        padding: "clamp(60px, 8vw, 100px) 0",
         minHeight: "100vh",
       }}
     >
+      <style>{`
+        .flavour-filter-bar::-webkit-scrollbar { display: none; }
+      `}</style>
+
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 5vw" }}>
 
         {/* Header */}
@@ -229,9 +244,9 @@ export default function FlavourWall() {
           <p
             style={{
               fontFamily: "var(--font-barlow)",
-              fontSize: 18,
+              fontSize: "clamp(14px, 2.5vw, 18px)",
               color: "rgba(255,255,255,0.6)",
-              maxWidth: 480,
+              maxWidth: isMobile ? "100%" : 480,
               margin: "0 auto",
             }}
           >
@@ -240,55 +255,104 @@ export default function FlavourWall() {
         </div>
 
         {/* Category filter bar */}
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            flexWrap: "wrap",
-            justifyContent: "center",
-            marginBottom: 48,
-          }}
-        >
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              style={{
-                fontFamily: "var(--font-barlow)",
-                fontWeight: 700,
-                fontSize: 12,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                padding: "8px 20px",
-                borderRadius: 24,
-                border: activeCategory === cat
-                  ? "1px solid var(--teal)"
-                  : "1px solid rgba(255,255,255,0.15)",
-                background: activeCategory === cat
-                  ? "rgba(0,245,212,0.12)"
-                  : "rgba(255,255,255,0.04)",
-                color: activeCategory === cat
-                  ? "var(--teal)"
-                  : "rgba(255,255,255,0.6)",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+        {isMobile ? (
+          <div
+            className="flavour-filter-bar"
+            style={{
+              overflowX: "auto",
+              display: "flex",
+              gap: 8,
+              padding: "0 5vw 12px",
+              scrollbarWidth: "none",
+              marginBottom: 36,
+              marginLeft: "-5vw",
+              marginRight: "-5vw",
+              WebkitOverflowScrolling: "touch",
+            } as React.CSSProperties}
+          >
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                style={{
+                  flex: "0 0 auto",
+                  fontFamily: "var(--font-barlow)",
+                  fontWeight: 700,
+                  fontSize: 11,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  padding: "8px 14px",
+                  minHeight: 44,
+                  whiteSpace: "nowrap",
+                  borderRadius: 24,
+                  border: activeCategory === cat
+                    ? "1px solid var(--teal)"
+                    : "1px solid rgba(255,255,255,0.15)",
+                  background: activeCategory === cat
+                    ? "rgba(0,245,212,0.12)"
+                    : "rgba(255,255,255,0.04)",
+                  color: activeCategory === cat
+                    ? "var(--teal)"
+                    : "rgba(255,255,255,0.6)",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              flexWrap: "wrap",
+              justifyContent: "center",
+              marginBottom: 48,
+            }}
+          >
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                style={{
+                  fontFamily: "var(--font-barlow)",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  padding: "8px 20px",
+                  borderRadius: 24,
+                  border: activeCategory === cat
+                    ? "1px solid var(--teal)"
+                    : "1px solid rgba(255,255,255,0.15)",
+                  background: activeCategory === cat
+                    ? "rgba(0,245,212,0.12)"
+                    : "rgba(255,255,255,0.04)",
+                  color: activeCategory === cat
+                    ? "var(--teal)"
+                    : "rgba(255,255,255,0.6)",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {/* Grid — 5 columns desktop, 2 mobile */}
+        {/* Grid — 2 columns mobile, auto-fill desktop */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-            gap: 16,
+            gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(220px, 1fr))",
+            gap: isMobile ? 12 : 20,
           }}
         >
           {filtered.map((flavour) => (
-            <FlavourCard key={flavour.id} flavour={flavour} />
+            <FlavourCard key={flavour.id} flavour={flavour} isMobile={isMobile} />
           ))}
         </div>
 

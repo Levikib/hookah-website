@@ -1,6 +1,6 @@
 "use client";
 import AnimatedTitle from "./AnimatedTitle";
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { RENTAL_MODELS as RENTALS } from "@/data/rentals";
 import { useStore } from "@/store/useStore";
 
@@ -11,10 +11,11 @@ const TIER_COLORS: Record<string, string> = {
   Event:    "var(--orange)",
 };
 
-function RentalCard({ rental, active, onSelect }: {
+function RentalCard({ rental, active, onSelect, isMobile }: {
   rental: typeof RENTALS[0];
   active: boolean;
   onSelect: () => void;
+  isMobile: boolean;
 }) {
   const addToCart = useStore((s) => s.addToCart);
   const accent = TIER_COLORS[rental.tier] ?? "var(--teal)";
@@ -29,12 +30,16 @@ function RentalCard({ rental, active, onSelect }: {
     });
   };
 
+  const cardWidth: string = active
+    ? (isMobile ? "min(300px, 82vw)" : "340px")
+    : (isMobile ? "min(220px, 60vw)" : "260px");
+
   return (
     <div
       onClick={onSelect}
       style={{
         flex: "0 0 auto",
-        width: active ? 340 : 260,
+        width: cardWidth,
         transition: "all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
         cursor: "pointer",
         opacity: active ? 1 : 0.55,
@@ -193,7 +198,15 @@ function RentalCard({ rental, active, onSelect }: {
 
 export default function RentalsSection() {
   const [activeIdx, setActiveIdx] = useState(2);
+  const [isMobile, setIsMobile] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const scrollTo = (idx: number) => {
     const next = Math.max(0, Math.min(RENTALS.length - 1, idx));
@@ -212,7 +225,7 @@ export default function RentalsSection() {
       id="rentals"
       style={{
         background: "var(--nebula)",
-        padding: "100px 0 120px",
+        padding: `clamp(60px, 8vw, 100px) 0`,
         minHeight: "100vh",
         overflow: "hidden",
       }}
@@ -231,7 +244,7 @@ export default function RentalsSection() {
           as="h2"
           start="top 85%"
           style={{
-            fontSize: "clamp(48px, 6vw, 80px)",
+            fontSize: "clamp(40px, 6vw, 80px)",
             lineHeight: 0.95,
             letterSpacing: "0.04em",
             color: "var(--text-primary)",
@@ -249,7 +262,7 @@ export default function RentalsSection() {
             overflowX: "auto",
             scrollSnapType: "x mandatory",
             scrollbarWidth: "none",
-            padding: "20px calc(50vw - 170px)", // centres first/last cards
+            padding: isMobile ? "20px 5vw" : "20px calc(50vw - 170px)",
             alignItems: "flex-start",
           }}
         >
@@ -259,12 +272,13 @@ export default function RentalsSection() {
                 rental={rental}
                 active={i === activeIdx}
                 onSelect={() => scrollTo(i)}
+                isMobile={isMobile}
               />
             </div>
           ))}
         </div>
 
-        {/* Prev / Next arrows */}
+        {/* Prev / Next arrows — hidden on mobile (swipe instead) */}
         {[
           { dir: -1, pos: { left: "2vw" }, label: "←" },
           { dir: 1,  pos: { right: "2vw" }, label: "→" },
@@ -285,7 +299,7 @@ export default function RentalsSection() {
               color: "#fff",
               fontSize: 18,
               cursor: "pointer",
-              display: "flex",
+              display: isMobile ? "none" : "flex",
               alignItems: "center",
               justifyContent: "center",
               backdropFilter: "blur(8px)",
@@ -300,6 +314,20 @@ export default function RentalsSection() {
         ))}
       </div>
 
+      {/* Swipe hint — mobile only */}
+      {isMobile && (
+        <p style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          color: "var(--teal)",
+          textAlign: "center",
+          marginTop: 12,
+          letterSpacing: "0.1em",
+        }}>
+          ← swipe →
+        </p>
+      )}
+
       {/* Dot indicators */}
       <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 32 }}>
         {RENTALS.map((_, i) => (
@@ -307,14 +335,14 @@ export default function RentalsSection() {
             key={i}
             onClick={() => scrollTo(i)}
             style={{
-              width: i === activeIdx ? 24 : 8,
-              height: 8,
+              width: i === activeIdx ? 24 : 12,
+              height: 12,
               borderRadius: 4,
               background: i === activeIdx ? "var(--purple)" : "rgba(255,255,255,0.2)",
               border: "none",
               cursor: "pointer",
               transition: "all 0.3s ease",
-              padding: 0,
+              padding: 4,
             }}
           />
         ))}

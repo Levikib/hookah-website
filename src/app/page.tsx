@@ -22,7 +22,7 @@ import { useStore } from "@/store/useStore";
 
 gsap.registerPlugin(ScrollTrigger);
 
-function HeroScene({ mouseX, mouseY }: { mouseX: number; mouseY: number }) {
+function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: number; isMobile: boolean }) {
   return (
     <>
       {/* Richer lighting rig */}
@@ -35,8 +35,8 @@ function HeroScene({ mouseX, mouseY }: { mouseX: number; mouseY: number }) {
       <HookahModel
         mouseX={mouseX}
         mouseY={mouseY}
-        scale={1.2}
-        position={[0.6, -1.8, 0]}
+        scale={isMobile ? 0.85 : 1.2}
+        position={isMobile ? [0, -1.4, 0] : [0.6, -1.8, 0]}
       />
 
       {/* Cosmic sparkles orbiting the model */}
@@ -87,7 +87,15 @@ export default function Home() {
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const heroFrameRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -147,7 +155,8 @@ export default function Home() {
           position: "relative",
           height: "100vh",
           display: "flex",
-          alignItems: "center",
+          alignItems: isMobile ? "flex-end" : "center",
+          paddingBottom: isMobile ? 60 : 0,
           overflow: "hidden",
         }}
       >
@@ -159,16 +168,21 @@ export default function Home() {
             background: "radial-gradient(circle, rgba(124,58,237,0.22) 0%, transparent 70%)",
             top: "-20%", right: "-10%",
             animation: "float-y 8s ease-in-out infinite",
+            display: isMobile ? "none" : "block",
           }} />
           <div style={{
-            position: "absolute", width: 500, height: 500,
+            position: "absolute",
+            width: isMobile ? 300 : 500,
+            height: isMobile ? 300 : 500,
             borderRadius: "50%",
             background: "radial-gradient(circle, rgba(6,182,212,0.15) 0%, transparent 70%)",
             bottom: "-10%", left: "5%",
             animation: "float-y 10s ease-in-out infinite reverse",
           }} />
           <div style={{
-            position: "absolute", width: 300, height: 300,
+            position: "absolute",
+            width: isMobile ? 180 : 300,
+            height: isMobile ? 180 : 300,
             borderRadius: "50%",
             background: "radial-gradient(circle, rgba(232,121,249,0.12) 0%, transparent 70%)",
             top: "40%", left: "40%",
@@ -186,7 +200,7 @@ export default function Home() {
               style={{ background: "transparent" }}
             >
               <Suspense fallback={null}>
-                <HeroScene mouseX={mouse.x} mouseY={mouse.y} />
+                <HeroScene mouseX={mouse.x} mouseY={mouse.y} isMobile={isMobile} />
               </Suspense>
             </Canvas>
           </div>
@@ -195,11 +209,13 @@ export default function Home() {
         {/* Left-side gradient scrim — legibility */}
         <div style={{
           position: "absolute", inset: 0, zIndex: 10, pointerEvents: "none",
-          background: "linear-gradient(to right, rgba(5,3,10,0.95) 0%, rgba(5,3,10,0.75) 38%, rgba(5,3,10,0.2) 60%, transparent 100%)",
+          background: isMobile
+            ? "linear-gradient(to top, rgba(5,3,10,0.97) 0%, rgba(5,3,10,0.85) 40%, rgba(5,3,10,0.3) 70%, transparent 100%)"
+            : "linear-gradient(to right, rgba(5,3,10,0.95) 0%, rgba(5,3,10,0.75) 38%, rgba(5,3,10,0.2) 60%, transparent 100%)",
         }} />
 
         {/* Hero content */}
-        <div style={{ position: "relative", zIndex: 20, maxWidth: 620, padding: "0 6vw" }}>
+        <div style={{ position: "relative", zIndex: 20, maxWidth: isMobile ? "100%" : 620, padding: isMobile ? "0 5vw" : "0 6vw" }}>
 
           {/* Tag */}
           <div className="section-label" style={{ marginBottom: 24 }}>
@@ -230,11 +246,11 @@ export default function Home() {
 
           <p style={{
             fontFamily: "var(--font-barlow)",
-            fontSize: 18,
+            fontSize: isMobile ? 16 : 18,
             lineHeight: 1.6,
             color: "var(--text-muted)",
             marginBottom: 40,
-            maxWidth: 420,
+            maxWidth: isMobile ? "100%" : 420,
             fontWeight: 400,
           }}>
             Premium hookah rentals, curated flavour sessions, and unforgettable
@@ -252,9 +268,10 @@ export default function Home() {
 
           {/* Stats row */}
           <div style={{
-            display: "flex", gap: 32, marginTop: 48,
+            display: "flex", gap: isMobile ? 20 : 32, marginTop: 48,
             paddingTop: 32,
             borderTop: "1px solid rgba(255,255,255,0.07)",
+            flexWrap: "wrap",
           }}>
             {[
               { value: "25+", label: "Premium Blends" },

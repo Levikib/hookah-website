@@ -46,7 +46,7 @@ export default function CartDrawer() {
         {/* Header */}
         <div
           style={{
-            padding: "24px 28px",
+            padding: "clamp(16px, 4vw, 28px)",
             borderBottom: "1px solid rgba(255,255,255,0.08)",
             display: "flex",
             justifyContent: "space-between",
@@ -78,12 +78,13 @@ export default function CartDrawer() {
               {cart.length} item{cart.length !== 1 ? "s" : ""}
             </p>
           </div>
+          {/* Close button — 44x44 touch target */}
           <button
             onClick={() => setCartOpen(false)}
             style={{
-              width: 36,
-              height: 36,
-              borderRadius: 8,
+              width: 44,
+              height: 44,
+              borderRadius: "50%",
               border: "1px solid rgba(255,255,255,0.12)",
               background: "rgba(255,255,255,0.06)",
               color: "#fff",
@@ -99,7 +100,7 @@ export default function CartDrawer() {
         </div>
 
         {/* Cart items */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px clamp(16px, 4vw, 28px)" }}>
           {cart.length === 0 ? (
             <div
               style={{
@@ -150,9 +151,9 @@ export default function CartDrawer() {
                         color: "#fff",
                         textTransform: "uppercase",
                         letterSpacing: "0.04em",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                        wordBreak: "break-word",
+                        overflowWrap: "break-word",
+                        whiteSpace: "normal",
                       }}
                     >
                       {item.name}
@@ -174,10 +175,10 @@ export default function CartDrawer() {
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 8,
+                      gap: 6,
                       background: "rgba(255,255,255,0.06)",
                       borderRadius: 8,
-                      padding: "4px 8px",
+                      padding: "4px 6px",
                     }}
                   >
                     <button
@@ -187,10 +188,17 @@ export default function CartDrawer() {
                           : updateQuantity(item.id, item.quantity - 1)
                       }
                       style={{
-                        width: 22, height: 22, borderRadius: 6,
-                        border: "none", background: "rgba(255,255,255,0.1)",
-                        color: "#fff", cursor: "pointer", fontSize: 14,
-                        display: "flex", alignItems: "center", justifyContent: "center",
+                        width: 36,
+                        height: 36,
+                        borderRadius: "50%",
+                        border: "none",
+                        background: "rgba(255,255,255,0.1)",
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontSize: 16,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
                     >
                       −
@@ -209,10 +217,17 @@ export default function CartDrawer() {
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
                       style={{
-                        width: 22, height: 22, borderRadius: 6,
-                        border: "none", background: "rgba(255,255,255,0.1)",
-                        color: "#fff", cursor: "pointer", fontSize: 14,
-                        display: "flex", alignItems: "center", justifyContent: "center",
+                        width: 36,
+                        height: 36,
+                        borderRadius: "50%",
+                        border: "none",
+                        background: "rgba(255,255,255,0.1)",
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontSize: 16,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
                     >
                       +
@@ -241,7 +256,7 @@ export default function CartDrawer() {
         {cart.length > 0 && (
           <div
             style={{
-              padding: "20px 28px",
+              padding: "20px clamp(16px, 4vw, 28px)",
               borderTop: "1px solid rgba(255,255,255,0.08)",
             }}
           >
@@ -282,7 +297,7 @@ export default function CartDrawer() {
                 setBookingOpen(true);
               }}
               className="btn-teal"
-              style={{ width: "100%", fontSize: 15, marginBottom: 10 }}
+              style={{ width: "100%", fontSize: 15, marginBottom: 10, minHeight: 44 }}
             >
               Book This Session →
             </button>
@@ -292,6 +307,7 @@ export default function CartDrawer() {
               style={{
                 width: "100%",
                 padding: "10px",
+                minHeight: 44,
                 background: "none",
                 border: "none",
                 fontFamily: "var(--font-barlow)",

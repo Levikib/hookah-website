@@ -106,7 +106,8 @@ export default function Preloader({ onComplete }: PreloaderProps) {
               color: "#06b6d4",
               letterSpacing: "0.15em",
               cursor: "pointer",
-              padding: "8px 0",
+              padding: "10px 16px",
+              minHeight: 44,
               opacity: showSkip ? 1 : 0,
               transition: "opacity 0.4s ease",
             }}
@@ -150,7 +151,7 @@ export default function Preloader({ onComplete }: PreloaderProps) {
           <h1
             style={{
               fontFamily: "var(--font-bebas, 'Bebas Neue', sans-serif)",
-              fontSize: 80,
+              fontSize: "clamp(40px, 10vw, 80px)",
               color: "#f0f2fa",
               letterSpacing: "0.15em",
               margin: 0,
@@ -165,7 +166,7 @@ export default function Preloader({ onComplete }: PreloaderProps) {
           <p
             style={{
               fontFamily: "var(--font-mono, 'Space Mono', monospace)",
-              fontSize: 11,
+              fontSize: "clamp(10px, 2vw, 11px)",
               color: "rgba(168,155,196,0.6)",
               letterSpacing: "0.2em",
               margin: 0,
@@ -183,7 +184,7 @@ export default function Preloader({ onComplete }: PreloaderProps) {
             bottom: 0,
             left: 0,
             right: 0,
-            height: 2,
+            height: 3,
             background: "rgba(255,255,255,0.08)",
           }}
         >
