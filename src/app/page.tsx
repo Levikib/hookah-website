@@ -37,8 +37,8 @@ function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: numbe
       <HookahModel
         mouseX={mouseX}
         mouseY={mouseY}
-        scale={isMobile ? 0.75 : 1.0}
-        position={isMobile ? [0, -1.2, 0] : [0.8, -1.2, 0]}
+        scale={isMobile ? 0.7 : 0.95}
+        position={isMobile ? [0, -1.0, 0] : [1.0, -0.8, 0]}
       />
 
       {/* Cosmic sparkles orbiting the model — desktop only */}
@@ -192,7 +192,7 @@ export default function Home() {
         {mounted && (
           <div style={{ position: "absolute", inset: 0, zIndex: 1 }}>
             <Canvas
-              camera={{ position: [0, 0, 6.5], fov: 52 }}
+              camera={{ position: [0, -0.5, 7], fov: 55 }}
               dpr={isMobile ? [1, 1] : [1, 1.5]}
               gl={{ alpha: true, antialias: true }}
               style={{ background: "transparent" }}
@@ -233,15 +233,16 @@ export default function Home() {
             Est. 2024 · Premium Hookah
           </p>
 
-          {/* Headline — 2 lines */}
+          {/* Headline — 2 lines, font sized to guarantee fit */}
           <h1 style={{
             fontFamily: "var(--font-sora)",
             fontWeight: 800,
-            fontSize: isMobile ? "clamp(44px, 11vw, 64px)" : "clamp(52px, 6vw, 80px)",
-            lineHeight: 1.08,
-            letterSpacing: "-0.03em",
+            fontSize: isMobile ? "clamp(36px, 9vw, 52px)" : "clamp(40px, 4.2vw, 62px)",
+            lineHeight: 1.1,
+            letterSpacing: "-0.02em",
             color: "#ffffff",
-            marginBottom: 32,
+            marginBottom: 28,
+            whiteSpace: "nowrap",
           }}>
             The Session Starts<br />
             <span style={{ color: "var(--cyan-bright)" }}>Here.</span>
