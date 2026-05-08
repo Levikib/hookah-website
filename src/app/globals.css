@@ -65,7 +65,7 @@ html {
 body {
   background: var(--void);
   color: var(--text-primary);
-  font-family: var(--font-grotesk), system-ui, sans-serif;
+  font-family: var(--font-inter), system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.6;
   overflow-x: hidden;
@@ -78,11 +78,11 @@ body {
 
 /* ── Typography ────────────────────────────────────────────────── */
 h1, h2, h3 {
-  font-family: var(--font-sora);
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-family: var(--font-bebas);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--text-primary);
-  line-height: 1.0;
+  line-height: 0.95;
 }
 
 /* ── Animated word — word-split reveal ─────────────────────────── */
@@ -315,14 +315,8 @@ h1, h2, h3 {
   }
 }
 
-/* ── Font + colour backward-compat aliases ────────────────────────── */
+/* ── Backward-compat aliases ────────────────────────────────────────── */
 :root {
-  /* Font aliases — all old --font-bebas/barlow/inter refs now use new stack */
-  --font-bebas:   var(--font-sora);
-  --font-barlow:  var(--font-grotesk);
-  --font-inter:   var(--font-grotesk);
-
-  /* Colour aliases */
   --black:  var(--void);
   --teal:   var(--cyan-bright);
   --purple: var(--violet-bright);

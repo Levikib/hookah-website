@@ -233,13 +233,14 @@ export default function Home() {
             Est. 2024 · Premium Hookah
           </p>
 
-          {/* Headline — 2 lines, font sized to guarantee fit */}
+          {/* Headline — 2 lines */}
           <h1 style={{
-            fontFamily: "var(--font-sora)",
-            fontWeight: 800,
-            fontSize: isMobile ? "clamp(36px, 9vw, 52px)" : "clamp(40px, 4.2vw, 62px)",
-            lineHeight: 1.1,
-            letterSpacing: "-0.02em",
+            fontFamily: "var(--font-bebas)",
+            fontWeight: 400,
+            fontSize: isMobile ? "clamp(52px, 13vw, 80px)" : "clamp(64px, 7vw, 100px)",
+            lineHeight: 1.0,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
             color: "#ffffff",
             marginBottom: 28,
             whiteSpace: "nowrap",

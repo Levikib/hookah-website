@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Sora, Space_Grotesk, Space_Mono } from "next/font/google";
+import { Bebas_Neue, Barlow_Condensed, Inter, Space_Mono } from "next/font/google";
 import "./globals.css";
 import NavAndCart from "@/components/NavAndCart";
 import { MobileProvider } from "@/context/MobileContext";
 
-const sora = Sora({ weight: ["300","400","600","700","800"], subsets: ["latin"], variable: "--font-sora", display: "swap" });
-const grotesk = Space_Grotesk({ weight: ["300","400","500","600","700"], subsets: ["latin"], variable: "--font-grotesk", display: "swap" });
+const bebas = Bebas_Neue({ weight: "400", subsets: ["latin"], variable: "--font-bebas", display: "swap" });
+const barlow = Barlow_Condensed({ weight: ["400","600","700"], subsets: ["latin"], variable: "--font-barlow", display: "swap" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const mono = Space_Mono({ weight: ["400","700"], subsets: ["latin"], variable: "--font-mono", display: "swap" });
 
 export const metadata: Metadata = {
@@ -22,7 +23,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sora.variable} ${grotesk.variable} ${mono.variable}`}>
+    <html lang="en" className={`${bebas.variable} ${barlow.variable} ${inter.variable} ${mono.variable}`}>
       <body className="antialiased">
         <MobileProvider>
         <NavAndCart />
