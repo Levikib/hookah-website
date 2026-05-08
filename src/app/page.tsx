@@ -233,18 +233,17 @@ export default function Home() {
             Est. 2024 · Premium Hookah
           </p>
 
-          {/* Headline — clean, tight, no animation mess */}
+          {/* Headline — 2 lines */}
           <h1 style={{
             fontFamily: "var(--font-sora)",
             fontWeight: 800,
-            fontSize: isMobile ? "clamp(44px, 11vw, 64px)" : "clamp(56px, 6.5vw, 88px)",
-            lineHeight: 1.05,
+            fontSize: isMobile ? "clamp(44px, 11vw, 64px)" : "clamp(52px, 6vw, 80px)",
+            lineHeight: 1.08,
             letterSpacing: "-0.03em",
             color: "#ffffff",
-            marginBottom: 20,
+            marginBottom: 32,
           }}>
-            The Session<br />
-            Starts<br />
+            The Session Starts<br />
             <span style={{ color: "var(--cyan-bright)" }}>Here.</span>
           </h1>
 
@@ -253,10 +252,11 @@ export default function Home() {
             fontFamily: "var(--font-grotesk)",
             fontWeight: 400,
             fontSize: isMobile ? 15 : 17,
-            lineHeight: 1.65,
+            lineHeight: 1.7,
             color: "rgba(240,242,250,0.65)",
             marginBottom: 36,
             maxWidth: 400,
+            paddingTop: 4,
           }}>
             Premium hookah rentals, curated flavour sessions,
             and unforgettable experiences — delivered to you.
