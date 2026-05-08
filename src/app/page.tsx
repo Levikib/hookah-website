@@ -28,18 +28,18 @@ gsap.registerPlugin(ScrollTrigger);
 function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: number; isMobile: boolean }) {
   return (
     <>
-      {/* Richer lighting rig */}
-      <ambientLight intensity={0.15} />
-      <pointLight position={[3, 5, 3]}   intensity={5}  color="#7c3aed" />
-      <pointLight position={[-4, 2, -2]} intensity={3}  color="#06b6d4" />
-      <pointLight position={[0, -2, 4]}  intensity={2}  color="#e879f9" />
-      <pointLight position={[0, 8, 0]}   intensity={1.5} color="#f59e0b" />
+      {/* Lighting — bright enough to read against dark bg, warm on brass/gold parts */}
+      <ambientLight intensity={0.6} />
+      <pointLight position={[4, 6, 5]}   intensity={8}  color="#ffffff" />
+      <pointLight position={[-4, 4, 3]}  intensity={5}  color="#00f5d4" />
+      <pointLight position={[2, -2, 4]}  intensity={3}  color="#ffd700" />
+      <pointLight position={[0, 10, 2]}  intensity={3}  color="#ffffff" />
 
       <HookahModel
         mouseX={mouseX}
         mouseY={mouseY}
-        scale={isMobile ? 0.85 : 1.2}
-        position={isMobile ? [0, -1.4, 0] : [0.6, -1.8, 0]}
+        scale={isMobile ? 0.75 : 1.0}
+        position={isMobile ? [0, -1.2, 0] : [0.8, -1.2, 0]}
       />
 
       {/* Cosmic sparkles orbiting the model — desktop only */}
@@ -74,11 +74,11 @@ function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: numbe
       {!isMobile && <SmokeParticles bowlY={1.65} />}
 
       <ContactShadows
-        position={[0.6, -1.82, 0]}
-        opacity={0.5}
+        position={[0.8, -1.25, 0]}
+        opacity={0.4}
         scale={4}
         blur={3}
-        color="#7c3aed"
+        color="#00f5d4"
       />
     </>
   );
@@ -193,7 +193,7 @@ export default function Home() {
         {mounted && (
           <div style={{ position: "absolute", inset: 0, zIndex: 1 }}>
             <Canvas
-              camera={{ position: [0, 0.5, 4.5], fov: 42 }}
+              camera={{ position: [0, 0.2, 5.5], fov: 48 }}
               dpr={isMobile ? [1, 1] : [1, 1.5]}
               gl={{ alpha: true, antialias: true }}
               style={{ background: "transparent" }}
@@ -209,8 +209,8 @@ export default function Home() {
         <div style={{
           position: "absolute", inset: 0, zIndex: 10, pointerEvents: "none",
           background: isMobile
-            ? "linear-gradient(to top, rgba(5,3,10,0.97) 0%, rgba(5,3,10,0.85) 40%, rgba(5,3,10,0.3) 70%, transparent 100%)"
-            : "linear-gradient(to right, rgba(5,3,10,0.95) 0%, rgba(5,3,10,0.75) 38%, rgba(5,3,10,0.2) 60%, transparent 100%)",
+            ? "linear-gradient(to top, rgba(5,3,10,0.97) 0%, rgba(5,3,10,0.8) 35%, rgba(5,3,10,0.2) 60%, transparent 100%)"
+            : "linear-gradient(to right, rgba(5,3,10,0.95) 0%, rgba(5,3,10,0.7) 32%, rgba(5,3,10,0.05) 50%, transparent 100%)",
         }} />
 
         {/* Hero content */}
