@@ -1,6 +1,6 @@
 "use client";
 import AnimatedTitle from "./AnimatedTitle";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { RENTAL_MODELS as RENTALS } from "@/data/rentals";
 import { useStore } from "@/store/useStore";
 
@@ -192,7 +192,20 @@ function RentalCard({ rental, active, onSelect }: {
 }
 
 export default function RentalsSection() {
-  const [activeIdx, setActiveIdx] = useState(2); // default to middle
+  const [activeIdx, setActiveIdx] = useState(2);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const scrollTo = (idx: number) => {
+    const next = Math.max(0, Math.min(RENTALS.length - 1, idx));
+    setActiveIdx(next);
+    const track = trackRef.current;
+    if (!track) return;
+    const card = track.children[next] as HTMLElement;
+    if (!card) return;
+    const trackCenter = track.offsetWidth / 2;
+    const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+    track.scrollTo({ left: cardCenter - trackCenter, behavior: "smooth" });
+  };
 
   return (
     <section
@@ -224,31 +237,66 @@ export default function RentalsSection() {
             color: "var(--text-primary)",
           }}
         />
-        <style>{`
-          .rentals-title div:last-child .animated-word { color: var(--violet-bright); }
-        `}</style>
       </div>
 
-      {/* Horizontal carousel */}
-      <div
-        style={{
-          display: "flex",
-          gap: 20,
-          padding: "20px 5vw",
-          overflowX: "auto",
-          scrollSnapType: "x mandatory",
-          scrollbarWidth: "none",
-          justifyContent: "center",
-          alignItems: "flex-start",
-        }}
-      >
-        {RENTALS.map((rental, i) => (
-          <RentalCard
-            key={rental.id}
-            rental={rental}
-            active={i === activeIdx}
-            onSelect={() => setActiveIdx(i)}
-          />
+      {/* Carousel track — no justify-content:center, use padding for centering effect */}
+      <div style={{ position: "relative" }}>
+        <div
+          ref={trackRef}
+          style={{
+            display: "flex",
+            gap: 20,
+            overflowX: "auto",
+            scrollSnapType: "x mandatory",
+            scrollbarWidth: "none",
+            padding: "20px calc(50vw - 170px)", // centres first/last cards
+            alignItems: "flex-start",
+          }}
+        >
+          {RENTALS.map((rental, i) => (
+            <div key={rental.id} style={{ scrollSnapAlign: "center", flex: "0 0 auto" }}>
+              <RentalCard
+                rental={rental}
+                active={i === activeIdx}
+                onSelect={() => scrollTo(i)}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Prev / Next arrows */}
+        {[
+          { dir: -1, pos: { left: "2vw" }, label: "←" },
+          { dir: 1,  pos: { right: "2vw" }, label: "→" },
+        ].map(({ dir, pos, label }) => (
+          <button
+            key={label}
+            onClick={() => scrollTo(activeIdx + dir)}
+            style={{
+              position: "absolute",
+              top: "50%",
+              transform: "translateY(-50%)",
+              ...pos,
+              width: 44,
+              height: 44,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.07)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              color: "#fff",
+              fontSize: 18,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backdropFilter: "blur(8px)",
+              transition: "background 0.2s",
+              zIndex: 10,
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(157,78,221,0.25)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.07)")}
+          >
+            {label}
+          </button>
         ))}
       </div>
 
@@ -257,7 +305,7 @@ export default function RentalsSection() {
         {RENTALS.map((_, i) => (
           <button
             key={i}
-            onClick={() => setActiveIdx(i)}
+            onClick={() => scrollTo(i)}
             style={{
               width: i === activeIdx ? 24 : 8,
               height: 8,

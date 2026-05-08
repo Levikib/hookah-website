@@ -9,55 +9,61 @@ import SmokeParticles from "./SmokeParticles";
 
 gsap.registerPlugin(ScrollTrigger);
 
-const LABEL_DATA = [
+const CTA_DATA = [
   {
     name: "hookah_bowl",
-    title: "The Bowl",
-    desc: "Hand-thrown clay bowl. Porous walls slow-cook the shisha for thick, smooth smoke.",
+    tag: "25 flavours",
+    title: "Choose Your Flavour",
+    desc: "From Double Apple to Midnight Blueberry — 25 premium shisha blends for every mood.",
+    cta: "Browse Flavours",
+    href: "#flavours",
+    accent: "var(--teal)",
     side: "right" as const,
-    top: "12%",
+    top: "10%",
   },
   {
     name: "hookah_shaft",
-    title: "The Shaft",
-    desc: "Brushed brass centre pole. 60cm tall for optimal smoke cooling distance.",
+    tag: "8 session tiers",
+    title: "Book a Session",
+    desc: "Solo, squad, VIP, or corporate — pick the setup that fits your crew and your night.",
+    cta: "View Sessions",
+    href: "#sessions",
+    accent: "var(--gold)",
     side: "left" as const,
-    top: "22%",
+    top: "25%",
   },
   {
     name: "hookah_hose_port",
-    title: "Hose Port",
-    desc: "Triple-threaded brass connector. Accepts 1–4 hoses simultaneously.",
+    tag: "6 models",
+    title: "Choose Your Hookah",
+    desc: "From The Classic to The Colossus — rent the piece that matches your vibe.",
+    cta: "See The Showroom",
+    href: "#rentals",
+    accent: "var(--purple)",
     side: "right" as const,
-    top: "42%",
+    top: "45%",
   },
   {
     name: "hookah_hose",
-    title: "The Hose",
-    desc: "Washable silicone hose. 1.5m reach, zero draw resistance.",
+    tag: "custom build",
+    title: "Design Your Setup",
+    desc: "Pick every detail — hookahs, people, flavours, hours, host, catering. Price updates live.",
+    cta: "Build Custom Session",
+    href: "#sessions",
+    accent: "var(--orange)",
     side: "left" as const,
-    top: "52%",
+    top: "63%",
   },
   {
     name: "hookah_base",
-    title: "The Base",
-    desc: "Borosilicate glass vase. Fills with water to filter and cool every draw.",
+    tag: "buy to keep",
+    title: "Shop Flavours",
+    desc: "Take your favourite blends home. Available in 50g, 100g, and 250g — delivered to you.",
+    cta: "Visit The Shop",
+    href: "#shop",
+    accent: "var(--teal)",
     side: "right" as const,
-    top: "65%",
-  },
-  {
-    name: "hookah_plate",
-    title: "The Tray",
-    desc: "Deep-dish brass coal tray. Catches ash so your session stays clean.",
-    side: "left" as const,
-    top: "78%",
-  },
-  {
-    name: "hookah_mouthpiece",
-    title: "Mouthpiece",
-    desc: "Individually sanitised hygienic tip. New tip, every session.",
-    side: "right" as const,
-    top: "88%",
+    top: "80%",
   },
 ];
 
@@ -66,6 +72,7 @@ export default function DisassemblySection() {
   const pinRef = useRef<HTMLDivElement>(null);
   const [explode, setExplode] = useState(0);
   const [progress, setProgress] = useState(0);
+  const ITEMS = CTA_DATA;
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -135,9 +142,9 @@ export default function DisassemblySection() {
               textTransform: "uppercase",
             }}
           >
-            Built for the session.
+            Everything you need.
             <br />
-            <span style={{ color: "var(--gold)" }}>Part by part.</span>
+            <span style={{ color: "var(--gold)" }}>All in one session.</span>
           </h2>
         </div>
 
@@ -171,63 +178,98 @@ export default function DisassemblySection() {
           </Canvas>
         </div>
 
-        {/* Label cards — appear progressively */}
-        {LABEL_DATA.map((item, i) => {
-          const threshold = (i + 1) / (LABEL_DATA.length + 1);
-          const opacity = Math.min(1, Math.max(0, (progress - threshold + 0.1) / 0.1));
+        {/* CTA cards — appear progressively as hookah disassembles */}
+        {ITEMS.map((item, i) => {
+          const threshold = (i + 1) / (ITEMS.length + 1);
+          const opacity = Math.min(1, Math.max(0, (progress - threshold + 0.12) / 0.12));
+          const translateY = (1 - opacity) * 24;
           return (
             <div
               key={item.name}
               style={{
                 position: "absolute",
                 top: item.top,
-                ...(item.side === "left"
-                  ? { left: "3vw" }
-                  : { right: "3vw" }),
+                ...(item.side === "left" ? { left: "3vw" } : { right: "3vw" }),
                 zIndex: 20,
                 opacity,
-                transform: `translateY(${(1 - opacity) * 20}px)`,
+                transform: `translateY(${translateY}px)`,
                 transition: "none",
-                maxWidth: 220,
-                pointerEvents: "none",
+                maxWidth: 260,
+                pointerEvents: opacity > 0.5 ? "auto" : "none",
               }}
             >
-              <div
-                className="glass"
-                style={{
-                  padding: "16px 20px",
-                  borderLeft: item.side === "left"
-                    ? "2px solid var(--teal)"
-                    : "none",
-                  borderRight: item.side === "right"
-                    ? "2px solid var(--gold)"
-                    : "none",
+              <a
+                href={item.href}
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.querySelector(item.href)?.scrollIntoView({ behavior: "smooth" });
                 }}
+                style={{ textDecoration: "none", display: "block" }}
               >
-                <p
+                <div
+                  className="glass"
                   style={{
+                    padding: "18px 22px",
+                    borderLeft: item.side === "left" ? `2px solid ${item.accent}` : "none",
+                    borderRight: item.side === "right" ? `2px solid ${item.accent}` : "none",
+                    cursor: "pointer",
+                    transition: "box-shadow 0.2s ease",
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLDivElement).style.boxShadow = `inset 0 0 24px ${item.accent}22, 0 8px 32px rgba(0,0,0,0.5)`;
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLDivElement).style.boxShadow = "";
+                  }}
+                >
+                  {/* Tag */}
+                  <p style={{
                     fontFamily: "var(--font-mono)",
-                    fontSize: 10,
-                    letterSpacing: "0.15em",
-                    color: item.side === "left" ? "var(--teal)" : "var(--gold)",
+                    fontSize: 9,
+                    letterSpacing: "0.18em",
+                    color: item.accent,
                     textTransform: "uppercase",
                     marginBottom: 6,
-                  }}
-                >
-                  {item.side === "left" ? "◀ " : ""}{item.title}{item.side === "right" ? " ▶" : ""}
-                </p>
-                <p
-                  style={{
+                  }}>
+                    {item.tag}
+                  </p>
+                  {/* Title */}
+                  <p style={{
+                    fontFamily: "var(--font-bebas)",
+                    fontSize: 22,
+                    letterSpacing: "0.05em",
+                    color: "#fff",
+                    textTransform: "uppercase",
+                    marginBottom: 8,
+                    lineHeight: 1,
+                  }}>
+                    {item.title}
+                  </p>
+                  {/* Description */}
+                  <p style={{
                     fontFamily: "var(--font-barlow)",
-                    fontSize: 14,
-                    color: "rgba(255,255,255,0.82)",
+                    fontSize: 13,
+                    color: "rgba(255,255,255,0.72)",
                     lineHeight: 1.5,
-                    margin: 0,
-                  }}
-                >
-                  {item.desc}
-                </p>
-              </div>
+                    marginBottom: 14,
+                  }}>
+                    {item.desc}
+                  </p>
+                  {/* CTA link */}
+                  <span style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: item.accent,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}>
+                    {item.cta} →
+                  </span>
+                </div>
+              </a>
             </div>
           );
         })}
@@ -271,7 +313,7 @@ export default function DisassemblySection() {
               letterSpacing: "0.1em",
             }}
           >
-            {Math.round(progress * 7)}/7 parts
+            {Math.min(ITEMS.length, Math.round(progress * ITEMS.length + 0.5))}/{ITEMS.length} options
           </span>
         </div>
       </div>

@@ -185,7 +185,7 @@ export default function FlavourWall() {
     ? FLAVOURS
     : FLAVOURS.filter((f) => f.category === activeCategory);
 
-  const categories = ["All", ...CATEGORIES];
+  const categories = [...CATEGORIES];
 
   return (
     <section

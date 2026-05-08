@@ -10,8 +10,15 @@ import DisassemblySection from "@/components/DisassemblySection";
 import FlavourWall from "@/components/FlavourWall";
 import SessionsSection from "@/components/SessionsSection";
 import RentalsSection from "@/components/RentalsSection";
+import FlavourShop from "@/components/FlavourShop";
 import Footer from "@/components/Footer";
 import AnimatedTitle from "@/components/AnimatedTitle";
+import Navigation from "@/components/Navigation";
+import CartDrawer from "@/components/CartDrawer";
+import CustomCursor from "@/components/CustomCursor";
+import Preloader from "@/components/Preloader";
+import BookingModal from "@/components/BookingModal";
+import { useStore } from "@/store/useStore";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -75,6 +82,8 @@ function HeroScene({ mouseX, mouseY }: { mouseX: number; mouseY: number }) {
 }
 
 export default function Home() {
+  const { setBookingOpen } = useStore();
+  const [preloaderDone, setPreloaderDone] = useState(false);
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -123,6 +132,9 @@ export default function Home() {
 
   return (
     <main style={{ background: "var(--void)", minHeight: "100vh", overflowX: "hidden" }}>
+      {!preloaderDone && <Preloader onComplete={() => setPreloaderDone(true)} />}
+      <Navigation />
+      <CustomCursor />
 
       {/* ══════════════════════════════════════════════════════════════
           HERO — full viewport, nebula background, 3D hookah
@@ -230,7 +242,7 @@ export default function Home() {
           </p>
 
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-            <button className="btn-teal" style={{ fontSize: 14 }}>
+            <button className="btn-teal" style={{ fontSize: 14 }} onClick={() => setBookingOpen(true)}>
               Book a Session ↗
             </button>
             <button className="btn-ghost" style={{ fontSize: 14 }}>
@@ -325,10 +337,17 @@ export default function Home() {
       <RentalsSection />
 
       {/* ══════════════════════════════════════════════════════════════
-          S6: FOOTER
+          S6: SHOP
+      ══════════════════════════════════════════════════════════════ */}
+      <FlavourShop />
+
+      {/* ══════════════════════════════════════════════════════════════
+          S7: FOOTER
       ══════════════════════════════════════════════════════════════ */}
       <Footer />
 
+      <CartDrawer />
+      <BookingModal />
     </main>
   );
 }
