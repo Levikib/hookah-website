@@ -58,6 +58,7 @@
 
 html {
   scroll-behavior: smooth;
+  overscroll-behavior: none;
   cursor: none; /* hide default cursor — custom cursor takes over */
 }
 
@@ -297,6 +298,21 @@ h1, h2, h3 {
 @keyframes scrollBounce {
   0%,100% { transform: translateX(-50%) translateY(0); }
   50%     { transform: translateX(-50%) translateY(6px); }
+}
+
+/* ── GPU acceleration hints ──────────────────────────────────── */
+.glass {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Only animate opacity and transform — never layout properties */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ── Backward-compat aliases (components written pre-cosmic still work) ── */

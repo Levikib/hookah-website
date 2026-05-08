@@ -1,8 +1,9 @@
 "use client";
 import AnimatedTitle from "./AnimatedTitle";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { RENTAL_MODELS as RENTALS } from "@/data/rentals";
 import { useStore } from "@/store/useStore";
+import { useIsMobile } from "@/context/MobileContext";
 
 const TIER_COLORS: Record<string, string> = {
   Standard: "var(--teal)",
@@ -198,15 +199,8 @@ function RentalCard({ rental, active, onSelect, isMobile }: {
 
 export default function RentalsSection() {
   const [activeIdx, setActiveIdx] = useState(2);
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile();
   const trackRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
 
   const scrollTo = (idx: number) => {
     const next = Math.max(0, Math.min(RENTALS.length - 1, idx));

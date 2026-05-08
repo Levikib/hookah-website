@@ -1,9 +1,10 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import AnimatedTitle from "./AnimatedTitle";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import { SESSIONS, CUSTOM_PRICING } from "@/data/sessions";
 import { useStore } from "@/store/useStore";
+import { useIsMobile } from "@/context/MobileContext";
 
 const SESSION_EMOJIS: Record<string, string> = {
   solo: "🌙",
@@ -290,14 +291,7 @@ function CustomBuilder({ isMobile }: { isMobile: boolean }) {
 
 export default function SessionsSection() {
   const setBookingOpen = useStore((s) => s.setBookingOpen);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
+  const isMobile = useIsMobile();
 
   return (
     <section style={{ background: "var(--nebula)", padding: "clamp(60px, 8vw, 100px) 0" }}>

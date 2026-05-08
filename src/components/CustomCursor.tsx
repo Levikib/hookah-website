@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useCallback } from "react";
+import { useIsMobile } from "@/context/MobileContext";
 
 interface Particle {
   x: number; y: number;
@@ -10,6 +11,7 @@ interface Particle {
 }
 
 export default function CustomCursor() {
+  const isMobile = useIsMobile();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const outerRef  = useRef<HTMLDivElement>(null);
   const innerRef  = useRef<HTMLDivElement>(null);
@@ -172,6 +174,9 @@ export default function CustomCursor() {
       document.removeEventListener("mouseover", onEnter);
     };
   }, [spawnSmoke]);
+
+  // Touch devices don't have cursors — skip rendering
+  if (isMobile) return null;
 
   return (
     <>

@@ -1,7 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { FLAVOURS, CATEGORIES, getStockStatus } from "@/data/flavours";
 import { useStore } from "@/store/useStore";
+import { useIsMobile } from "@/context/MobileContext";
 
 type Size = "50g" | "100g" | "250g";
 
@@ -268,14 +269,7 @@ function ShopCard({ flavour, selectedSize, onSizeChange, isMobile }: ShopCardPro
 export default function FlavourShop() {
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [selectedSizes, setSelectedSizes] = useState<Record<number, Size>>({});
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
+  const isMobile = useIsMobile();
 
   const filtered =
     activeCategory === "All"

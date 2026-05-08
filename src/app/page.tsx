@@ -4,21 +4,24 @@ import { Canvas } from "@react-three/fiber";
 import { ContactShadows, Sparkles } from "@react-three/drei";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import dynamic from "next/dynamic";
 import HookahModel from "@/components/HookahModel";
 import SmokeParticles from "@/components/SmokeParticles";
-import DisassemblySection from "@/components/DisassemblySection";
-import FlavourWall from "@/components/FlavourWall";
-import SessionsSection from "@/components/SessionsSection";
-import RentalsSection from "@/components/RentalsSection";
-import FlavourShop from "@/components/FlavourShop";
-import Footer from "@/components/Footer";
 import AnimatedTitle from "@/components/AnimatedTitle";
 import Navigation from "@/components/Navigation";
-import CartDrawer from "@/components/CartDrawer";
 import CustomCursor from "@/components/CustomCursor";
 import Preloader from "@/components/Preloader";
-import BookingModal from "@/components/BookingModal";
 import { useStore } from "@/store/useStore";
+import { useIsMobile } from "@/context/MobileContext";
+
+const DisassemblySection = dynamic(() => import("@/components/DisassemblySection"), { ssr: false });
+const FlavourWall = dynamic(() => import("@/components/FlavourWall"), { ssr: false });
+const SessionsSection = dynamic(() => import("@/components/SessionsSection"), { ssr: false });
+const RentalsSection = dynamic(() => import("@/components/RentalsSection"), { ssr: false });
+const FlavourShop = dynamic(() => import("@/components/FlavourShop"), { ssr: false });
+const Footer = dynamic(() => import("@/components/Footer"), { ssr: false });
+const BookingModal = dynamic(() => import("@/components/BookingModal"), { ssr: false });
+const CartDrawer = dynamic(() => import("@/components/CartDrawer"), { ssr: false });
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -39,8 +42,8 @@ function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: numbe
         position={isMobile ? [0, -1.4, 0] : [0.6, -1.8, 0]}
       />
 
-      {/* Cosmic sparkles orbiting the model */}
-      <Sparkles
+      {/* Cosmic sparkles orbiting the model — desktop only */}
+      {!isMobile && <Sparkles
         count={120}
         scale={[2.5, 4, 2.5]}
         size={2}
@@ -48,8 +51,8 @@ function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: numbe
         color="#e879f9"
         opacity={0.6}
         position={[0.6, 0, 0]}
-      />
-      <Sparkles
+      />}
+      {!isMobile && <Sparkles
         count={60}
         scale={[3.5, 5, 3.5]}
         size={1.5}
@@ -57,8 +60,8 @@ function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: numbe
         color="#06b6d4"
         opacity={0.5}
         position={[0.6, 0.5, 0]}
-      />
-      <Sparkles
+      />}
+      {!isMobile && <Sparkles
         count={40}
         scale={[1.5, 2.5, 1.5]}
         size={3}
@@ -66,9 +69,9 @@ function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: numbe
         color="#f59e0b"
         opacity={0.7}
         position={[0.6, 1, 0]}
-      />
+      />}
 
-      <SmokeParticles bowlY={1.65} />
+      {!isMobile && <SmokeParticles bowlY={1.65} />}
 
       <ContactShadows
         position={[0.6, -1.82, 0]}
@@ -87,15 +90,8 @@ export default function Home() {
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile();
   const heroFrameRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -132,6 +128,8 @@ export default function Home() {
           start: "center center",
           end: "bottom center",
           scrub: true,
+          fastScrollEnd: true,
+          preventOverlaps: true,
         },
       });
     });
@@ -158,6 +156,7 @@ export default function Home() {
           alignItems: isMobile ? "flex-end" : "center",
           paddingBottom: isMobile ? 60 : 0,
           overflow: "hidden",
+          willChange: "clip-path",
         }}
       >
         {/* Animated nebula gradient orbs */}
@@ -195,7 +194,7 @@ export default function Home() {
           <div style={{ position: "absolute", inset: 0, zIndex: 1 }}>
             <Canvas
               camera={{ position: [0, 0.5, 4.5], fov: 42 }}
-              dpr={[1, 1.5]}
+              dpr={isMobile ? [1, 1] : [1, 1.5]}
               gl={{ alpha: true, antialias: true }}
               style={{ background: "transparent" }}
             >

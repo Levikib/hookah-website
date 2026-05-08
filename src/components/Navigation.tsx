@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useStore } from "@/store/useStore";
+import { useIsMobile } from "@/context/MobileContext";
 
 const NAV_LINKS = [
   { label: "Sessions", href: "#sessions" },
@@ -11,7 +12,7 @@ const NAV_LINKS = [
 export default function Navigation() {
   const [visible, setVisible] = useState(false);
   const [activeSection, setActiveSection] = useState("");
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
   const cartCount = useStore((s) => s.cartCount());
   const setCartOpen = useStore((s) => s.setCartOpen);
@@ -22,13 +23,6 @@ export default function Navigation() {
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
   }, []);
 
   // Close menu on resize to desktop

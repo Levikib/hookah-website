@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useIsMobile } from "@/context/MobileContext";
 
 function StarField({ height }: { height: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -102,14 +103,7 @@ const FOOTER_LINKS = {
 };
 
 export default function Footer() {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
+  const isMobile = useIsMobile();
 
   const starfieldHeight = isMobile ? 200 : 360;
 

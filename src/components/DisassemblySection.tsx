@@ -6,6 +6,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import HookahModel from "./HookahModel";
 import SmokeParticles from "./SmokeParticles";
+import { useIsMobile } from "@/context/MobileContext";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -20,6 +21,8 @@ const CTA_DATA = [
     accent: "var(--teal)",
     side: "right" as const,
     top: "10%",
+    mobileTop: "50%",
+    mobileSide: "right" as const,
   },
   {
     name: "hookah_shaft",
@@ -31,6 +34,8 @@ const CTA_DATA = [
     accent: "var(--gold)",
     side: "left" as const,
     top: "25%",
+    mobileTop: "58%",
+    mobileSide: "left" as const,
   },
   {
     name: "hookah_hose_port",
@@ -42,6 +47,8 @@ const CTA_DATA = [
     accent: "var(--purple)",
     side: "right" as const,
     top: "45%",
+    mobileTop: "66%",
+    mobileSide: "right" as const,
   },
   {
     name: "hookah_hose",
@@ -53,6 +60,8 @@ const CTA_DATA = [
     accent: "var(--orange)",
     side: "left" as const,
     top: "63%",
+    mobileTop: "74%",
+    mobileSide: "left" as const,
   },
   {
     name: "hookah_base",
@@ -64,6 +73,8 @@ const CTA_DATA = [
     accent: "var(--teal)",
     side: "right" as const,
     top: "80%",
+    mobileTop: "82%",
+    mobileSide: "right" as const,
   },
 ];
 
@@ -73,6 +84,7 @@ export default function DisassemblySection() {
   const [explode, setExplode] = useState(0);
   const [progress, setProgress] = useState(0);
   const ITEMS = CTA_DATA;
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -82,10 +94,12 @@ export default function DisassemblySection() {
           start: "top top",
           end: "+=300%",
           pin: pinRef.current,
-          scrub: 1.5,
+          scrub: 2,
           onUpdate: (self) => {
-            setExplode(self.progress);
-            setProgress(self.progress);
+            const p = self.progress;
+            setExplode(p);
+            // Only update progress display every 5% to avoid constant re-renders
+            setProgress(Math.round(p * 20) / 20);
           },
         },
       });
@@ -93,6 +107,11 @@ export default function DisassemblySection() {
     }, sectionRef);
     return () => ctx.revert();
   }, []);
+
+  // Mobile camera: zoomed out more; desktop: current
+  const cameraProps = isMobile
+    ? { position: [0, 0.5, 6] as [number, number, number], fov: 50 }
+    : { position: [0, 1.2, 5] as [number, number, number], fov: 38 };
 
   return (
     <section
@@ -135,7 +154,7 @@ export default function DisassemblySection() {
           <h2
             style={{
               fontFamily: "var(--font-bebas)",
-              fontSize: "clamp(40px, 5vw, 64px)",
+              fontSize: "clamp(28px, 5vw, 64px)",
               color: "#fff",
               letterSpacing: "0.04em",
               lineHeight: 1,
@@ -151,9 +170,9 @@ export default function DisassemblySection() {
         {/* 3D Canvas */}
         <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
           <Canvas
-            camera={{ position: [0, 1.2, 5], fov: 38 }}
-            dpr={[1, 1.5]}
-            gl={{ alpha: true, antialias: true }}
+            camera={cameraProps}
+            dpr={isMobile ? [1, 1] : [1, 1.5]}
+            gl={{ alpha: true, antialias: !isMobile }}
             style={{ background: "transparent" }}
           >
             <Suspense fallback={null}>
@@ -166,7 +185,7 @@ export default function DisassemblySection() {
                 scale={1.0}
                 position={[0, -1.6, 0]}
               />
-              <SmokeParticles bowlY={explode > 0.1 ? 99 : 1.65} />
+              {!isMobile && <SmokeParticles bowlY={explode > 0.1 ? 99 : 1.65} />}
               <ContactShadows
                 position={[0, -1.62, 0]}
                 opacity={Math.max(0, 0.3 - explode * 0.3)}
@@ -183,18 +202,24 @@ export default function DisassemblySection() {
           const threshold = (i + 1) / (ITEMS.length + 1);
           const opacity = Math.min(1, Math.max(0, (progress - threshold + 0.12) / 0.12));
           const translateY = (1 - opacity) * 24;
+
+          const cardTop = isMobile ? item.mobileTop : item.top;
+          const cardSide = isMobile ? item.mobileSide : item.side;
+          const cardMaxWidth = isMobile ? "44vw" : 260;
+          const cardPadding = isMobile ? "12px 14px" : "18px 22px";
+
           return (
             <div
               key={item.name}
               style={{
                 position: "absolute",
-                top: item.top,
-                ...(item.side === "left" ? { left: "3vw" } : { right: "3vw" }),
+                top: cardTop,
+                ...(cardSide === "left" ? { left: isMobile ? "2vw" : "3vw" } : { right: isMobile ? "2vw" : "3vw" }),
                 zIndex: 20,
                 opacity,
                 transform: `translateY(${translateY}px)`,
                 transition: "none",
-                maxWidth: 260,
+                maxWidth: cardMaxWidth,
                 pointerEvents: opacity > 0.5 ? "auto" : "none",
               }}
             >
@@ -209,9 +234,9 @@ export default function DisassemblySection() {
                 <div
                   className="glass"
                   style={{
-                    padding: "18px 22px",
-                    borderLeft: item.side === "left" ? `2px solid ${item.accent}` : "none",
-                    borderRight: item.side === "right" ? `2px solid ${item.accent}` : "none",
+                    padding: cardPadding,
+                    borderLeft: cardSide === "left" ? `2px solid ${item.accent}` : "none",
+                    borderRight: cardSide === "right" ? `2px solid ${item.accent}` : "none",
                     cursor: "pointer",
                     transition: "box-shadow 0.2s ease",
                   }}
@@ -236,35 +261,37 @@ export default function DisassemblySection() {
                   {/* Title */}
                   <p style={{
                     fontFamily: "var(--font-bebas)",
-                    fontSize: 22,
+                    fontSize: isMobile ? 16 : 22,
                     letterSpacing: "0.05em",
                     color: "#fff",
                     textTransform: "uppercase",
-                    marginBottom: 8,
+                    marginBottom: isMobile ? 0 : 8,
                     lineHeight: 1,
                   }}>
                     {item.title}
                   </p>
-                  {/* Description */}
+                  {/* Description — hidden on mobile to reduce clutter */}
                   <p style={{
                     fontFamily: "var(--font-barlow)",
                     fontSize: 13,
                     color: "rgba(255,255,255,0.72)",
                     lineHeight: 1.5,
                     marginBottom: 14,
+                    display: isMobile ? "none" : "block",
                   }}>
                     {item.desc}
                   </p>
                   {/* CTA link */}
                   <span style={{
                     fontFamily: "var(--font-mono)",
-                    fontSize: 11,
+                    fontSize: isMobile ? 10 : 11,
                     letterSpacing: "0.12em",
                     textTransform: "uppercase",
                     color: item.accent,
                     display: "flex",
                     alignItems: "center",
                     gap: 6,
+                    marginTop: isMobile ? 6 : 0,
                   }}>
                     {item.cta} →
                   </span>
@@ -289,7 +316,7 @@ export default function DisassemblySection() {
         >
           <div
             style={{
-              width: 120,
+              width: isMobile ? 80 : 120,
               height: 2,
               background: "rgba(255,255,255,0.15)",
               borderRadius: 1,

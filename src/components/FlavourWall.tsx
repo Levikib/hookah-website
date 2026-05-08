@@ -1,8 +1,9 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import AnimatedTitle from "./AnimatedTitle";
 import { FLAVOURS, CATEGORIES, getStockStatus } from "@/data/flavours";
 import { useStore } from "@/store/useStore";
+import { useIsMobile } from "@/context/MobileContext";
 
 const INTENSITY_COLORS = {
   Mild: "var(--teal)",
@@ -183,14 +184,7 @@ function FlavourCard({ flavour, isMobile }: { flavour: typeof FLAVOURS[0]; isMob
 
 export default function FlavourWall() {
   const [activeCategory, setActiveCategory] = useState("All");
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
+  const isMobile = useIsMobile();
 
   const filtered = activeCategory === "All"
     ? FLAVOURS

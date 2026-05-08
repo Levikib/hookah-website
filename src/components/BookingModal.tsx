@@ -1,9 +1,10 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useStore } from "@/store/useStore";
 import { SESSIONS } from "@/data/sessions";
 import { FLAVOURS } from "@/data/flavours";
 import type { Flavour } from "@/data/flavours";
+import { useIsMobile } from "@/context/MobileContext";
 
 // ── Session emoji map ────────────────────────────────────────────────────────
 const SESSION_EMOJI: Record<string, string> = {
@@ -657,12 +658,7 @@ function Step3Flavours({ isMobile }: { isMobile: boolean }) {
 
 // ── STEP 4: Review & Confirm ─────────────────────────────────────────────────
 function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void; isMobile: boolean }) {
-  const {
-    booking,
-    setPromoCode,
-    resetBooking,
-    setBookingOpen,
-  } = useStore();
+  const { booking, setPromoCode } = useStore();
 
   const { session, date, timeSlot, location, deliveryAddress, selectedFlavours, promoCode } = booking;
 
@@ -681,10 +677,6 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
     const ref = genRef();
     onConfirm(ref);
   };
-
-  // suppress unused var warnings
-  void resetBooking;
-  void setBookingOpen;
 
   return (
     <div>
@@ -989,15 +981,7 @@ export default function BookingModal() {
   const { bookingOpen, setBookingOpen, booking, setBookingStep, resetBooking } = useStore();
   const [confirmed, setConfirmed] = useState(false);
   const [refNum, setRefNum] = useState("");
-
-  // Mobile detection
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
+  const isMobile = useIsMobile();
 
   const step = booking.step;
 
