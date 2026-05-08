@@ -7,7 +7,6 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import dynamic from "next/dynamic";
 import HookahModel from "@/components/HookahModel";
 import SmokeParticles from "@/components/SmokeParticles";
-import AnimatedTitle from "@/components/AnimatedTitle";
 import Navigation from "@/components/Navigation";
 import CustomCursor from "@/components/CustomCursor";
 import Preloader from "@/components/Preloader";
@@ -193,7 +192,7 @@ export default function Home() {
         {mounted && (
           <div style={{ position: "absolute", inset: 0, zIndex: 1 }}>
             <Canvas
-              camera={{ position: [0, 0.2, 5.5], fov: 48 }}
+              camera={{ position: [0, 0, 6.5], fov: 52 }}
               dpr={isMobile ? [1, 1] : [1, 1.5]}
               gl={{ alpha: true, antialias: true }}
               style={{ background: "transparent" }}
@@ -214,85 +213,97 @@ export default function Home() {
         }} />
 
         {/* Hero content */}
-        <div style={{ position: "relative", zIndex: 20, maxWidth: isMobile ? "100%" : 620, padding: isMobile ? "0 5vw" : "0 6vw" }}>
+        <div style={{
+          position: "relative", zIndex: 20,
+          maxWidth: isMobile ? "100%" : 560,
+          padding: isMobile ? "0 6vw" : "0 7vw",
+          display: "flex", flexDirection: "column", gap: 0,
+        }}>
 
           {/* Tag */}
-          <div className="section-label" style={{ marginBottom: 24 }}>
-            Est. 2024 · Premium Hookah Experience
-          </div>
-
-          {/* Animated headline */}
-          <AnimatedTitle
-            text={"The Session\nStarts\nHere."}
-            as="h1"
-            start="top 90%"
-            style={{
-              fontSize: "clamp(60px, 9vw, 110px)",
-              lineHeight: 0.92,
-              letterSpacing: "0.02em",
-              marginBottom: 28,
-              color: "var(--text-primary)",
-            }}
-          />
-
-          {/* Highlight word — override last line color */}
-          <style>{`
-            .animated-title div:last-child .animated-word:last-child {
-              color: var(--electric);
-              -webkit-text-stroke: 1px rgba(237,255,102,0.3);
-            }
-          `}</style>
-
           <p style={{
-            fontFamily: "var(--font-barlow)",
-            fontSize: isMobile ? 16 : 18,
-            lineHeight: 1.6,
-            color: "var(--text-muted)",
-            marginBottom: 40,
-            maxWidth: isMobile ? "100%" : 420,
-            fontWeight: 400,
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            letterSpacing: "0.28em",
+            textTransform: "uppercase",
+            color: "var(--cyan-bright)",
+            marginBottom: 20,
+            opacity: 0.85,
           }}>
-            Premium hookah rentals, curated flavour sessions, and unforgettable
-            experiences — delivered to your door or venue.
+            Est. 2024 · Premium Hookah
           </p>
 
-          <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-            <button className="btn-teal" style={{ fontSize: 14 }} onClick={() => setBookingOpen(true)}>
+          {/* Headline — clean, tight, no animation mess */}
+          <h1 style={{
+            fontFamily: "var(--font-sora)",
+            fontWeight: 800,
+            fontSize: isMobile ? "clamp(44px, 11vw, 64px)" : "clamp(56px, 6.5vw, 88px)",
+            lineHeight: 1.05,
+            letterSpacing: "-0.03em",
+            color: "#ffffff",
+            marginBottom: 20,
+          }}>
+            The Session<br />
+            Starts<br />
+            <span style={{ color: "var(--cyan-bright)" }}>Here.</span>
+          </h1>
+
+          {/* Subtext */}
+          <p style={{
+            fontFamily: "var(--font-grotesk)",
+            fontWeight: 400,
+            fontSize: isMobile ? 15 : 17,
+            lineHeight: 1.65,
+            color: "rgba(240,242,250,0.65)",
+            marginBottom: 36,
+            maxWidth: 400,
+          }}>
+            Premium hookah rentals, curated flavour sessions,
+            and unforgettable experiences — delivered to you.
+          </p>
+
+          {/* CTAs */}
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <button
+              className="btn-teal"
+              style={{ fontSize: 13, letterSpacing: "0.08em" }}
+              onClick={() => setBookingOpen(true)}
+            >
               Book a Session ↗
             </button>
-            <button className="btn-ghost" style={{ fontSize: 14 }}>
+            <button className="btn-ghost" style={{ fontSize: 13, letterSpacing: "0.08em" }}>
               Explore Flavours
             </button>
           </div>
 
-          {/* Stats row */}
+          {/* Stats */}
           <div style={{
-            display: "flex", gap: isMobile ? 20 : 32, marginTop: 48,
-            paddingTop: 32,
-            borderTop: "1px solid rgba(255,255,255,0.07)",
+            display: "flex", gap: isMobile ? 24 : 36,
+            marginTop: 44, paddingTop: 28,
+            borderTop: "1px solid rgba(255,255,255,0.08)",
             flexWrap: "wrap",
           }}>
             {[
-              { value: "25+", label: "Premium Blends" },
-              { value: "6",   label: "Hookah Models" },
-              { value: "8",   label: "Session Tiers" },
+              { value: "25+", label: "Blends" },
+              { value: "6",   label: "Models" },
+              { value: "8",   label: "Tiers" },
             ].map(({ value, label }) => (
               <div key={label}>
                 <p style={{
-                  fontFamily: "var(--font-bebas)",
-                  fontSize: 36,
-                  color: "var(--electric)",
+                  fontFamily: "var(--font-sora)",
+                  fontWeight: 700,
+                  fontSize: isMobile ? 28 : 32,
+                  color: "var(--cyan-bright)",
                   lineHeight: 1,
                   marginBottom: 4,
-                  letterSpacing: "0.04em",
                 }}>
                   {value}
                 </p>
                 <p style={{
                   fontFamily: "var(--font-mono)",
                   fontSize: 9,
-                  color: "var(--text-dim)",
-                  letterSpacing: "0.18em",
+                  color: "rgba(240,242,250,0.35)",
+                  letterSpacing: "0.2em",
                   textTransform: "uppercase",
                 }}>
                   {label}
