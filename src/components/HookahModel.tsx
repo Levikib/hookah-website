@@ -4,6 +4,9 @@ import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
+// Tell drei's GLTFLoader where to find the Draco decoder
+useGLTF.setDecoderPath("/draco/");
+
 export const HOOKAH_PARTS = [
   "hookah_plate",
   "hookah_shaft",
@@ -15,13 +18,13 @@ export const HOOKAH_PARTS = [
 ] as const;
 
 export const EXPLODE_OFFSETS: Record<string, [number, number, number]> = {
-  hookah_plate: [-2.2, -0.8, 0],
-  hookah_shaft: [0, 2.0, 0],
-  hookah_hose_port: [2.2, 0.4, 0],
-  hookah_mouthpiece: [2.4, 1.6, 0],
-  hookah_base: [-2.4, -1.6, 0],
-  hookah_bowl: [0, 2.8, 0],
-  hookah_hose: [-2.6, 0.8, 0],
+  hookah_plate:    [-2.2, -0.8, 0],
+  hookah_shaft:    [0,     2.0, 0],
+  hookah_hose_port:[2.2,   0.4, 0],
+  hookah_mouthpiece:[2.4,  1.6, 0],
+  hookah_base:     [-2.4, -1.6, 0],
+  hookah_bowl:     [0,     2.8, 0],
+  hookah_hose:     [-2.6,  0.8, 0],
 };
 
 interface HookahModelProps {
@@ -51,13 +54,15 @@ export default function HookahModel({
   useFrame(() => {
     if (!groupRef.current) return;
 
-    const stiffness = 0.08;
+    // Spring damping ~0.85 per frame toward mouse target
+    const stiffness = 0.06;
     targetRotX.current += (mouseY * -0.14 - targetRotX.current) * stiffness;
-    targetRotY.current += (mouseX * 0.14 - targetRotY.current) * stiffness;
+    targetRotY.current += (mouseX *  0.14 - targetRotY.current) * stiffness;
 
     groupRef.current.rotation.x = targetRotX.current;
     groupRef.current.rotation.y = targetRotY.current;
 
+    // Explode parts toward offset positions (0 = assembled, 1 = fully exploded)
     for (const name of HOOKAH_PARTS) {
       const obj = partRefs.current[name];
       if (!obj) continue;
