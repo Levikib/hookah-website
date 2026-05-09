@@ -309,9 +309,9 @@ function Step2DateTime({ isMobile }: { isMobile: boolean }) {
                 border: "1px solid rgba(255,255,255,0.12)",
                 borderRadius: 8,
                 color: canGoPrev ? "var(--text-primary)" : "rgba(255,255,255,0.2)",
-                width: 32, height: 32,
+                width: 44, height: 44, minHeight: 44,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 16,
+                fontSize: 18,
                 cursor: "none",
               }}
             >‹</button>
@@ -330,9 +330,9 @@ function Step2DateTime({ isMobile }: { isMobile: boolean }) {
                 border: "1px solid rgba(255,255,255,0.12)",
                 borderRadius: 8,
                 color: "var(--text-primary)",
-                width: 32, height: 32,
+                width: 44, height: 44, minHeight: 44,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 16,
+                fontSize: 18,
                 cursor: "none",
               }}
             >›</button>

@@ -78,6 +78,46 @@ const CTA_DATA = [
   },
 ];
 
+// ─── Mobile version: clean vertical CTA list, no 3D, no pin ─────────────────
+function MobileDisassembly() {
+  return (
+    <section style={{ background: "var(--nebula)", padding: "60px 5vw" }}>
+      <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.22em", color: "var(--teal)", textTransform: "uppercase", marginBottom: 12 }}>
+        What we offer
+      </p>
+      <h2 style={{ fontFamily: "var(--font-bebas)", fontSize: "clamp(36px,10vw,56px)", color: "#fff", lineHeight: 1, textTransform: "uppercase", marginBottom: 36 }}>
+        Everything you need.<br />
+        <span style={{ color: "var(--gold)" }}>All in one session.</span>
+      </h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {CTA_DATA.map((item) => (
+          <a
+            key={item.name}
+            href={item.href}
+            onClick={(e) => { e.preventDefault(); document.querySelector(item.href)?.scrollIntoView({ behavior: "smooth" }); }}
+            style={{ textDecoration: "none" }}
+          >
+            <div style={{
+              display: "flex", alignItems: "center", gap: 16,
+              padding: "16px 18px", borderRadius: 14,
+              background: "rgba(255,255,255,0.04)",
+              border: `1px solid ${item.accent}33`,
+              borderLeft: `3px solid ${item.accent}`,
+              minHeight: 72,
+            }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.18em", color: item.accent, textTransform: "uppercase", marginBottom: 4 }}>{item.tag}</p>
+                <p style={{ fontFamily: "var(--font-bebas)", fontSize: 20, letterSpacing: "0.04em", color: "#fff", textTransform: "uppercase", lineHeight: 1 }}>{item.title}</p>
+              </div>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 18, color: item.accent }}>→</span>
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function DisassemblySection() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const pinRef = useRef<HTMLDivElement>(null);
@@ -87,6 +127,7 @@ export default function DisassemblySection() {
   const isMobile = useIsMobile();
 
   useEffect(() => {
+    if (isMobile) return; // no pinning on mobile
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
         scrollTrigger: {
@@ -98,20 +139,18 @@ export default function DisassemblySection() {
           onUpdate: (self) => {
             const p = self.progress;
             setExplode(p);
-            // Only update progress display every 5% to avoid constant re-renders
             setProgress(Math.round(p * 20) / 20);
           },
         },
       });
-      tl.to({}, { duration: 1 }); // placeholder for scrub
+      tl.to({}, { duration: 1 });
     }, sectionRef);
     return () => ctx.revert();
-  }, []);
+  }, [isMobile]);
 
-  // Mobile camera: zoomed out more; desktop: current
-  const cameraProps = isMobile
-    ? { position: [0, 0.5, 6] as [number, number, number], fov: 50 }
-    : { position: [0, 1.2, 5] as [number, number, number], fov: 38 };
+  const cameraProps = { position: [0, 1.2, 5] as [number, number, number], fov: 38 };
+
+  if (isMobile) return <MobileDisassembly />;
 
   return (
     <section

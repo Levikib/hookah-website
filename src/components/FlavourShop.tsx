@@ -214,17 +214,21 @@ function JarModal({
         background: "rgba(4,2,10,0.82)",
         backdropFilter: "blur(14px)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 20,
+        padding: "16px",
+        overflowY: "auto",
       }}
     >
       <div
         ref={panelRef}
         style={{
           width: "min(580px, 96vw)",
+          maxHeight: "calc(100vh - 40px)",
           background: "linear-gradient(160deg, #0d0a1e 0%, #110d28 60%, #0a0818 100%)",
           border: `1.5px solid rgba(${rgb},0.5)`,
           borderRadius: 20,
           overflow: "hidden",
+          overflowY: "auto",
+          margin: "auto",
           boxShadow: `0 0 0 1px rgba(${rgb},0.15), 0 32px 80px rgba(0,0,0,0.85), 0 0 60px rgba(${rgb},0.12)`,
           position: "relative",
         }}
@@ -235,9 +239,10 @@ function JarModal({
         {/* Close */}
         <button
           onClick={close}
+          className="no-min-h"
           style={{
-            position: "absolute", top: 16, right: 16, zIndex: 10,
-            width: 36, height: 36, borderRadius: "50%",
+            position: "absolute", top: 12, right: 12, zIndex: 10,
+            width: 44, height: 44, borderRadius: "50%",
             border: "1px solid rgba(255,255,255,0.12)",
             background: "rgba(255,255,255,0.05)",
             color: "rgba(255,255,255,0.6)", fontSize: 20, lineHeight: 1,

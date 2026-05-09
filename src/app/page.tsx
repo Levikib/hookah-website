@@ -238,13 +238,12 @@ export default function Home() {
           <h1 style={{
             fontFamily: "var(--font-bebas)",
             fontWeight: 400,
-            fontSize: isMobile ? "clamp(52px, 13vw, 80px)" : "clamp(64px, 7vw, 100px)",
+            fontSize: isMobile ? "clamp(44px, 12vw, 72px)" : "clamp(64px, 7vw, 100px)",
             lineHeight: 1.0,
             letterSpacing: "0.04em",
             textTransform: "uppercase",
             color: "#ffffff",
             marginBottom: 28,
-            whiteSpace: "nowrap",
           }}>
             The Session Starts<br />
             <span style={{ color: "var(--cyan-bright)" }}>Here.</span>
@@ -266,7 +265,7 @@ export default function Home() {
           </p>
 
           {/* CTAs */}
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 12, flexDirection: isMobile ? "column" : "row" }}>
             <button
               className="btn-teal"
               style={{ fontSize: 13, letterSpacing: "0.08em" }}
@@ -274,7 +273,11 @@ export default function Home() {
             >
               Book a Session ↗
             </button>
-            <button className="btn-ghost" style={{ fontSize: 13, letterSpacing: "0.08em" }}>
+            <button
+              className="btn-ghost"
+              style={{ fontSize: 13, letterSpacing: "0.08em" }}
+              onClick={() => { const el = document.getElementById("flavours"); if (el) el.scrollIntoView({ behavior: "smooth" }); }}
+            >
               Explore Flavours
             </button>
           </div>
@@ -348,18 +351,14 @@ export default function Home() {
       <DisassemblySection />
 
       {/* ══════════════════════════════════════════════════════════════
-          S3: FLAVOUR WALL
+          S3: FLAVOUR WALL — section id="flavours" is inside component
       ══════════════════════════════════════════════════════════════ */}
-      <section id="flavours">
-        <FlavourWall />
-      </section>
+      <FlavourWall />
 
       {/* ══════════════════════════════════════════════════════════════
-          S4: SESSIONS
+          S4: SESSIONS — section id="sessions" is inside component
       ══════════════════════════════════════════════════════════════ */}
-      <section id="sessions">
-        <SessionsSection />
-      </section>
+      <SessionsSection />
 
       {/* ══════════════════════════════════════════════════════════════
           S5: RENTALS

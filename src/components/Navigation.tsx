@@ -38,11 +38,13 @@ export default function Navigation() {
 
   // ---------- scroll visibility ----------
   useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY > 80);
+    // Mobile: show nav immediately; desktop: wait 80px
+    const threshold = isMobile ? 0 : 80;
+    const onScroll = () => setVisible(window.scrollY > threshold);
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [isMobile]);
 
   // ---------- close menu on resize to desktop ----------
   useEffect(() => {
@@ -150,13 +152,12 @@ export default function Navigation() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          background: visible ? "rgba(10,10,15,0.88)" : "transparent",
-          backdropFilter: visible ? "blur(20px)" : "none",
-          borderBottom: visible
-            ? "1px solid rgba(255,255,255,0.07)"
-            : "none",
-          transition:
-            "background 0.35s ease, backdrop-filter 0.35s ease, border-color 0.35s ease",
+          background: visible ? "rgba(10,10,15,0.92)" : "transparent",
+          backdropFilter: visible ? "blur(16px) saturate(180%)" : "none",
+          WebkitBackdropFilter: visible ? "blur(16px) saturate(180%)" : "none",
+          borderBottom: visible ? "1px solid rgba(255,255,255,0.07)" : "none",
+          willChange: "background",
+          transition: "background 0.2s ease, border-color 0.2s ease",
         }}
       >
         {/* Logo */}

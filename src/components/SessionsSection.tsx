@@ -840,11 +840,12 @@ function SessionModal({
           </div>
           {/* Close */}
           <button onClick={close} style={{
-            position: "absolute", top: 16, right: 16,
-            width: 36, height: 36, borderRadius: "50%",
+            position: "absolute", top: 12, right: 12,
+            width: 44, height: 44, borderRadius: "50%",
             background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)",
-            color: "rgba(255,255,255,0.7)", fontSize: 16,
+            color: "rgba(255,255,255,0.7)", fontSize: 18,
             display: "flex", alignItems: "center", justifyContent: "center",
+            minHeight: 44,
           }}>✕</button>
         </div>
 
