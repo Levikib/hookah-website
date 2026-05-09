@@ -1,55 +1,28 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface PreloaderProps {
   onComplete: () => void;
 }
 
-const EMBER_COLORS = ["#f59e0b", "#e879f9", "#7c3aed"];
-
-interface EmberStyle {
-  left: string;
-  bottom: string;
-  width: string;
-  height: string;
-  background: string;
-  animationDelay: string;
-  animationDuration: string;
-  offsetX: string;
-}
-
-const embers: EmberStyle[] = Array.from({ length: 12 }, (_, i) => {
-  const size = 6 + Math.random() * 4;
-  const color = EMBER_COLORS[i % EMBER_COLORS.length];
-  const delay = Math.round(Math.random() * 800);
-  const duration = 1.2 + Math.random() * 0.8;
-  const offsetX = (Math.random() * 80 - 40).toFixed(0);
-  return {
-    left: `calc(50% + ${(Math.random() * 60 - 30).toFixed(0)}px)`,
-    bottom: "8%",
-    width: `${size.toFixed(0)}px`,
-    height: `${size.toFixed(0)}px`,
-    background: color,
-    animationDelay: `${delay}ms`,
-    animationDuration: `${duration.toFixed(2)}s`,
-    offsetX: `${offsetX}px`,
-  };
-});
-
 export default function Preloader({ onComplete }: PreloaderProps) {
   const [done, setDone] = useState(false);
   const [showSkip, setShowSkip] = useState(false);
   const [progressActive, setProgressActive] = useState(false);
+  const [brandVisible, setBrandVisible] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Start progress bar on next frame
     const raf = requestAnimationFrame(() => setProgressActive(true));
 
+    const brandTimer = setTimeout(() => setBrandVisible(true), 1000);
     const skipTimer = setTimeout(() => setShowSkip(true), 1500);
-    const doneTimer = setTimeout(() => setDone(true), 2800);
+    const doneTimer = setTimeout(() => setDone(true), 3000);
 
     return () => {
       cancelAnimationFrame(raf);
+      clearTimeout(brandTimer);
       clearTimeout(skipTimer);
       clearTimeout(doneTimer);
     };
@@ -57,7 +30,7 @@ export default function Preloader({ onComplete }: PreloaderProps) {
 
   useEffect(() => {
     if (!done) return;
-    const t = setTimeout(onComplete, 400);
+    const t = setTimeout(onComplete, 500);
     return () => clearTimeout(t);
   }, [done, onComplete]);
 
@@ -66,75 +39,78 @@ export default function Preloader({ onComplete }: PreloaderProps) {
   return (
     <>
       <style>{`
-        @keyframes ember-rise {
-          0%   { transform: translateY(0) translateX(0) scale(1);    opacity: 0.9; }
-          100% { transform: translateY(-120px) translateX(var(--ember-drift)) scale(0.3); opacity: 0; }
+        @keyframes hookah-draw {
+          0%   { stroke-dashoffset: 1200; }
+          100% { stroke-dashoffset: 0; }
         }
-        @keyframes logo-pulse {
-          0%, 100% { text-shadow: 0 0 20px rgba(124,58,237,0.4); }
-          50%       { text-shadow: 0 0 60px rgba(124,58,237,0.9), 0 0 120px rgba(232,121,249,0.3); }
+        @keyframes brand-fadein {
+          0%   { opacity: 0; transform: translateY(12px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes skip-fadein {
+          0%   { opacity: 0; }
+          100% { opacity: 1; }
+        }
+        @keyframes preloader-exit {
+          0%   { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1.05); }
+        }
+        .hookah-svg-path {
+          stroke-dasharray: 1200;
+          stroke-dashoffset: 1200;
+          animation: hookah-draw 1.8s cubic-bezier(0.4,0,0.2,1) forwards;
+        }
+        .brand-text {
+          opacity: 0;
+          animation: brand-fadein 0.6s ease forwards;
+          animation-delay: 1s;
+        }
+        .skip-btn {
+          opacity: 0;
+          animation: skip-fadein 0.4s ease forwards;
+          animation-delay: 1.5s;
+        }
+        .preloader-exit {
+          animation: preloader-exit 0.5s cubic-bezier(0.4,0,0.2,1) forwards;
         }
       `}</style>
 
       <div
+        ref={containerRef}
+        className={done ? "preloader-exit" : ""}
         style={{
           position: "fixed",
           inset: 0,
           zIndex: 9999,
-          background: "#05030a",
+          background: "#000",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          opacity: done ? 0 : 1,
           pointerEvents: done ? "none" : "auto",
-          transition: "opacity 0.4s ease",
         }}
       >
         {/* Skip button */}
-        {showSkip && (
-          <button
-            onClick={handleSkip}
-            style={{
-              position: "absolute",
-              top: 24,
-              right: 32,
-              background: "none",
-              border: "none",
-              fontFamily: "var(--font-mono, 'Space Mono', monospace)",
-              fontSize: 11,
-              color: "#06b6d4",
-              letterSpacing: "0.15em",
-              cursor: "pointer",
-              padding: "10px 16px",
-              minHeight: 44,
-              opacity: showSkip ? 1 : 0,
-              transition: "opacity 0.4s ease",
-            }}
-          >
-            SKIP →
-          </button>
-        )}
-
-        {/* Ember particles */}
-        {embers.map((e, i) => (
-          <div
-            key={i}
-            style={{
-              position: "absolute",
-              left: e.left,
-              bottom: e.bottom,
-              width: e.width,
-              height: e.height,
-              borderRadius: "50%",
-              background: e.background,
-              // @ts-expect-error -- CSS custom property for keyframe drift
-              "--ember-drift": e.offsetX,
-              animation: `ember-rise ${e.animationDuration} ease-out ${e.animationDelay} infinite`,
-              pointerEvents: "none",
-            }}
-          />
-        ))}
+        <button
+          onClick={handleSkip}
+          className="skip-btn"
+          style={{
+            position: "absolute",
+            bottom: 32,
+            right: 32,
+            background: "none",
+            border: "none",
+            fontFamily: "var(--font-mono, 'Space Mono', monospace)",
+            fontSize: 11,
+            color: "rgba(255,255,255,0.4)",
+            letterSpacing: "0.15em",
+            cursor: "pointer",
+            padding: "10px 16px",
+            minHeight: 44,
+          }}
+        >
+          SKIP →
+        </button>
 
         {/* Center content */}
         <div
@@ -142,60 +118,157 @@ export default function Preloader({ onComplete }: PreloaderProps) {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: 16,
-            position: "relative",
-            zIndex: 1,
+            gap: 24,
           }}
         >
+          {/* Hookah SVG silhouette — draws itself */}
+          <svg
+            viewBox="0 0 80 200"
+            width="80"
+            height="200"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ overflow: "visible" }}
+          >
+            {/* Bowl — ellipse at top */}
+            <ellipse
+              cx="40" cy="15" rx="18" ry="8"
+              stroke="var(--cyan-bright)"
+              strokeWidth="1.5"
+              className="hookah-svg-path"
+              style={{ animationDelay: "0s" }}
+            />
+            {/* Bowl inner detail */}
+            <ellipse
+              cx="40" cy="15" rx="12" ry="5"
+              stroke="var(--cyan-bright)"
+              strokeWidth="1.5"
+              opacity="0.5"
+              className="hookah-svg-path"
+              style={{ animationDelay: "0.1s" }}
+            />
+            {/* Shaft — tapered vertical from bowl to base */}
+            <path
+              d="M37 23 L37 115 Q37 120 40 120 Q43 120 43 115 L43 23"
+              stroke="var(--cyan-bright)"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+              className="hookah-svg-path"
+              style={{ animationDelay: "0.15s" }}
+            />
+            {/* Plate — ellipse at shaft mid */}
+            <ellipse
+              cx="40" cy="115" rx="14" ry="4"
+              stroke="var(--cyan-bright)"
+              strokeWidth="1.5"
+              className="hookah-svg-path"
+              style={{ animationDelay: "0.3s" }}
+            />
+            {/* Base — ornate trapezoid */}
+            <path
+              d="M30 120 Q26 128 22 140 L58 140 Q54 128 50 120 Z"
+              stroke="var(--cyan-bright)"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+              className="hookah-svg-path"
+              style={{ animationDelay: "0.4s" }}
+            />
+            {/* Base bottom ring */}
+            <ellipse
+              cx="40" cy="140" rx="18" ry="5"
+              stroke="var(--cyan-bright)"
+              strokeWidth="1.5"
+              className="hookah-svg-path"
+              style={{ animationDelay: "0.5s" }}
+            />
+            {/* Base foot detail */}
+            <path
+              d="M24 145 Q22 150 20 155 L60 155 Q58 150 56 145"
+              stroke="var(--cyan-bright)"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+              className="hookah-svg-path"
+              style={{ animationDelay: "0.55s" }}
+            />
+            <ellipse
+              cx="40" cy="155" rx="20" ry="5"
+              stroke="var(--cyan-bright)"
+              strokeWidth="1.5"
+              className="hookah-svg-path"
+              style={{ animationDelay: "0.6s" }}
+            />
+            {/* Hose port — small rect at shaft mid-point */}
+            <rect
+              x="43" y="68" width="8" height="5" rx="1"
+              stroke="var(--cyan-bright)"
+              strokeWidth="1.5"
+              className="hookah-svg-path"
+              style={{ animationDelay: "0.65s" }}
+            />
+            {/* Hose — S-curve from port going right and down */}
+            <path
+              d="M51 70.5 C62 70 68 80 65 90 C62 100 75 108 78 118"
+              stroke="var(--cyan-bright)"
+              strokeWidth="1.5"
+              fill="none"
+              strokeLinecap="round"
+              className="hookah-svg-path"
+              style={{ animationDelay: "0.75s" }}
+            />
+            {/* Mouthpiece circle at hose end */}
+            <circle
+              cx="78" cy="121" r="4"
+              stroke="var(--cyan-bright)"
+              strokeWidth="1.5"
+              className="hookah-svg-path"
+              style={{ animationDelay: "0.9s" }}
+            />
+          </svg>
+
           {/* Brand name */}
-          <h1
-            style={{
-              fontFamily: "var(--font-bebas, 'Bebas Neue', sans-serif)",
-              fontSize: "clamp(40px, 10vw, 80px)",
-              color: "#f0f2fa",
-              letterSpacing: "0.15em",
-              margin: 0,
-              lineHeight: 1,
-              animation: "logo-pulse 2.5s ease-in-out infinite",
-            }}
-          >
-            HOOKAH
-          </h1>
-
-          {/* Tagline */}
-          <p
-            style={{
-              fontFamily: "var(--font-mono, 'Space Mono', monospace)",
-              fontSize: "clamp(10px, 2vw, 11px)",
-              color: "rgba(168,155,196,0.6)",
-              letterSpacing: "0.2em",
-              margin: 0,
-              textTransform: "uppercase",
-            }}
-          >
-            Premium Sessions · Curated Flavours · Delivered
-          </p>
-        </div>
-
-        {/* Progress bar */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 3,
-            background: "rgba(255,255,255,0.08)",
-          }}
-        >
           <div
+            className="brand-text"
             style={{
-              height: "100%",
-              background: "#f59e0b",
-              width: progressActive ? "100%" : "0%",
-              transition: "width 2.5s linear",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 12,
             }}
-          />
+          >
+            <h1
+              style={{
+                fontFamily: "var(--font-bebas, 'Bebas Neue', sans-serif)",
+                fontSize: 72,
+                color: "#fff",
+                letterSpacing: "0.3em",
+                margin: 0,
+                lineHeight: 1,
+              }}
+            >
+              HKH
+            </h1>
+
+            {/* Progress line */}
+            <div
+              style={{
+                width: "100%",
+                height: 1,
+                background: "rgba(255,255,255,0.1)",
+                borderRadius: 1,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  background: "var(--gold, #f59e0b)",
+                  width: progressActive ? "100%" : "0%",
+                  transition: "width 2.5s linear",
+                  borderRadius: 1,
+                }}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </>

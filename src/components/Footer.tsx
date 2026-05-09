@@ -1,284 +1,446 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useIsMobile } from "@/context/MobileContext";
 
-function StarField({ height }: { height: number }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const resize = () => {
-      canvas.width = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-    };
-    resize();
-
-    const stars = Array.from({ length: 200 }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      r: Math.random() * 1.5 + 0.3,
-      opacity: Math.random() * 0.7 + 0.2,
-      twinkleSpeed: Math.random() * 0.02 + 0.005,
-      twinkleOffset: Math.random() * Math.PI * 2,
-    }));
-
-    let frame = 0;
-    let raf: number;
-
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const t = frame * 0.016;
-
-      stars.forEach((s) => {
-        const twinkle = 0.5 + 0.5 * Math.sin(t * s.twinkleSpeed * 60 + s.twinkleOffset);
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255,255,255,${s.opacity * twinkle})`;
-        ctx.fill();
-      });
-
-      // Draw hookah constellation
-      const cx = canvas.width * 0.5;
-      const cy = canvas.height * 0.4;
-      const points = [
-        [cx, cy - 60],       // bowl top
-        [cx, cy - 20],       // bowl base
-        [cx, cy + 50],       // shaft mid
-        [cx, cy + 100],      // base top
-        [cx - 40, cy + 130], // base left
-        [cx + 40, cy + 130], // base right
-        [cx + 30, cy + 30],  // hose port
-        [cx + 80, cy + 10],  // hose mid
-        [cx + 100, cy - 20], // mouthpiece
-      ];
-      const connections = [[0,1],[1,2],[2,3],[3,4],[3,5],[2,6],[6,7],[7,8]];
-
-      connections.forEach(([a, b]) => {
-        const pa = points[a], pb = points[b];
-        const grad = ctx.createLinearGradient(pa[0], pa[1], pb[0], pb[1]);
-        grad.addColorStop(0, "rgba(0,245,212,0.35)");
-        grad.addColorStop(1, "rgba(157,78,221,0.35)");
-        ctx.beginPath();
-        ctx.moveTo(pa[0], pa[1]);
-        ctx.lineTo(pb[0], pb[1]);
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      });
-
-      points.forEach(([x, y]) => {
-        ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(0,245,212,0.8)";
-        ctx.fill();
-      });
-
-      frame++;
-      raf = requestAnimationFrame(draw);
-    };
-    draw();
-
-    const ro = new ResizeObserver(resize);
-    ro.observe(canvas);
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
-  }, []);
-
+// ── Inline SVG social icons ────────────────────────────────────────
+function IconInstagram() {
   return (
-    <canvas
-      ref={canvasRef}
-      style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-    />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor" stroke="none" />
+    </svg>
   );
 }
 
-const FOOTER_LINKS = {
-  Sessions: ["Solo Session", "Squad Session", "VIP Experience", "Corporate Events", "Weddings"],
-  Flavours: ["Classic Blends", "Fresh & Minty", "Tropical Mix", "Premium Reserve", "Mystery Box"],
-  Rentals:  ["Standard Models", "Premium Models", "Luxury Models", "Event Packages", "Delivery"],
-  Company:  ["About Us", "How It Works", "FAQ", "Gallery", "Contact"],
-};
+function IconTikTok() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
+    </svg>
+  );
+}
 
-export default function Footer() {
-  const isMobile = useIsMobile();
+function IconWhatsApp() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  );
+}
 
-  const starfieldHeight = isMobile ? 200 : 360;
+const SOCIAL_LINKS = [
+  { label: "Instagram", href: "#", icon: <IconInstagram /> },
+  { label: "TikTok",    href: "#", icon: <IconTikTok />    },
+  { label: "WhatsApp",  href: "#", icon: <IconWhatsApp />  },
+];
+
+const QUICK_LINKS = [
+  { label: "Sessions",  href: "#sessions"  },
+  { label: "Flavours",  href: "#flavours"  },
+  { label: "Rentals",   href: "#rentals"   },
+  { label: "Shop",      href: "#shop"      },
+  { label: "Book Now",  href: "#book"      },
+];
+
+// ── Newsletter component ───────────────────────────────────────────
+function NewsletterForm() {
+  const [email, setEmail]     = useState("");
+  const [success, setSuccess] = useState(false);
+  const [flash, setFlash]     = useState(false);
+
+  const handleJoin = () => {
+    if (!email.trim()) return;
+    setSuccess(true);
+    setFlash(true);
+    // Reset flash after animation
+    setTimeout(() => setFlash(false), 800);
+  };
 
   return (
-    <footer style={{ background: "#020205", position: "relative", overflow: "hidden" }}>
-      {/* Starfield outro */}
-      <div style={{ position: "relative", height: starfieldHeight, overflow: "hidden" }}>
-        <StarField height={starfieldHeight} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <p style={{
+        fontFamily: "var(--font-barlow)",
+        fontSize: 13,
+        color: "rgba(255,255,255,0.45)",
+        lineHeight: 1.5,
+        marginBottom: 4,
+      }}>
+        Join the circle. First to know about drops & events.
+      </p>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input
+          type="email"
+          placeholder="your@email.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleJoin()}
+          style={{
+            flex: 1,
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 8,
+            padding: "10px 14px",
+            fontFamily: "var(--font-mono)",
+            fontSize: 12,
+            color: "#fff",
+            outline: "none",
+            minHeight: 44,
+          }}
+        />
+        <button
+          onClick={handleJoin}
+          style={{
+            background: flash ? "var(--gold, #f59e0b)" : "rgba(255,255,255,0.08)",
+            border: `1px solid ${flash ? "var(--gold, #f59e0b)" : "rgba(255,255,255,0.15)"}`,
+            borderRadius: 8,
+            padding: "10px 16px",
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            letterSpacing: "0.12em",
+            color: flash ? "#000" : (success ? "var(--gold, #f59e0b)" : "#fff"),
+            cursor: "none",
+            minHeight: 44,
+            minWidth: 64,
+            transition: "background 0.25s ease, color 0.25s ease, border-color 0.25s ease",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {success ? (flash ? "✓ YOU'RE IN" : "✓ YOU'RE IN") : "JOIN"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Footer ────────────────────────────────────────────────────
+export default function Footer() {
+  const isMobile = useIsMobile();
+  const shimmerRef = useRef<HTMLDivElement>(null);
+
+  // Trigger shimmer animation via CSS only (no GSAP needed here)
+  useEffect(() => {
+    // shimmer line is purely CSS
+  }, []);
+
+  const scrollTo = (href: string) => {
+    const el = document.querySelector(href);
+    if (el) el.scrollIntoView({ behavior: "smooth" });
+  };
+
+  return (
+    <>
+      <style>{`
+        @keyframes shimmer-sweep {
+          0%   { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        .footer-shimmer-line {
+          position: relative;
+          height: 1px;
+          background: rgba(255,255,255,0.07);
+          overflow: hidden;
+        }
+        .footer-shimmer-line::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            90deg,
+            transparent 0%,
+            var(--gold, #f59e0b) 40%,
+            var(--cyan-bright, #22d3ee) 60%,
+            transparent 100%
+          );
+          animation: shimmer-sweep 3s linear infinite;
+        }
+        .footer-social-btn:hover {
+          color: var(--cyan-bright, #22d3ee) !important;
+          border-color: rgba(34,211,238,0.35) !important;
+          background: rgba(34,211,238,0.06) !important;
+        }
+        .footer-quick-link:hover {
+          color: var(--cyan-bright, #22d3ee) !important;
+        }
+      `}</style>
+
+      <footer
+        style={{
+          background: "var(--void, #05030a)",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        {/* Animated shimmer line at top */}
+        <div className="footer-shimmer-line" />
+
+        {/* Watermark "HKH" */}
         <div
+          aria-hidden="true"
           style={{
             position: "absolute",
-            inset: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
+            top: "clamp(20px, 5vw, 60px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            fontFamily: "var(--font-bebas, 'Bebas Neue', sans-serif)",
+            fontSize: "20vw",
+            lineHeight: 1,
+            color: "#fff",
+            opacity: 0.04,
+            pointerEvents: "none",
+            userSelect: "none",
+            whiteSpace: "nowrap",
+            letterSpacing: "0.05em",
+          }}
+        >
+          HKH
+        </div>
+
+        {/* Main grid */}
+        <div
+          style={{
+            maxWidth: 1280,
+            margin: "0 auto",
+            padding: `clamp(60px, 8vw, 100px) 5vw 0`,
+            position: "relative",
             zIndex: 1,
           }}
         >
-          <p style={{
-            fontFamily: "var(--font-mono)", fontSize: 11,
-            letterSpacing: "0.25em", color: "var(--teal)",
-            textTransform: "uppercase", marginBottom: 16,
-          }}>
-            ✦ The Session Never Ends ✦
-          </p>
-          <h2 style={{
-            fontFamily: "var(--font-bebas)",
-            fontSize: "clamp(48px, 7vw, 88px)",
-            color: "#fff", letterSpacing: "0.04em",
-            textTransform: "uppercase", textAlign: "center",
-            lineHeight: 0.95, marginBottom: 32,
-          }}>
-            Book Your<br />
-            <span style={{ color: "var(--teal)" }}>Session Tonight.</span>
-          </h2>
-          <button className="btn-teal" style={{ fontSize: 16, padding: "14px 36px" }}>
-            Book a Session
-          </button>
-        </div>
-        {/* Fade to footer */}
-        <div style={{
-          position: "absolute", bottom: 0, left: 0, right: 0, height: 80,
-          background: "linear-gradient(to bottom, transparent, #020205)",
-          zIndex: 2,
-        }} />
-      </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile
+                ? "repeat(2, 1fr)"
+                : "1.6fr 1fr 1.4fr",
+              gap: isMobile ? 40 : 56,
+              marginBottom: 56,
+            }}
+          >
+            {/* ── Col 1: Brand ── */}
+            <div style={isMobile ? { gridColumn: "1 / -1" } : {}}>
+              {/* Logo */}
+              <div
+                style={{
+                  fontFamily: "var(--font-bebas, 'Bebas Neue', sans-serif)",
+                  fontSize: 36,
+                  letterSpacing: "0.1em",
+                  color: "#fff",
+                  marginBottom: 12,
+                  lineHeight: 1,
+                }}
+              >
+                <span style={{ color: "var(--cyan-bright, #22d3ee)" }}>HKH</span>
+                <span style={{ fontSize: 16, color: "rgba(255,255,255,0.3)", marginLeft: 4 }}>™</span>
+              </div>
 
-      {/* Footer grid */}
-      <div
-        style={{
-          maxWidth: 1280, margin: "0 auto",
-          padding: `clamp(60px, 8vw, 100px) 5vw 40px`,
-          borderTop: "1px solid rgba(255,255,255,0.06)",
-        }}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "2fr repeat(4, 1fr)",
-            gap: 40,
-            marginBottom: 48,
-          }}
-        >
-          {/* Brand column */}
-          <div style={isMobile ? { gridColumn: "1 / -1" } : {}}>
-            <h3 style={{
-              fontFamily: "var(--font-bebas)",
-              fontSize: "clamp(24px, 5vw, 32px)",
-              color: "#fff", letterSpacing: "0.08em",
-              textTransform: "uppercase", marginBottom: 12,
-            }}>
-              <span style={{ color: "var(--teal)" }}>Hookah</span>™
-            </h3>
-            <p style={{
-              fontFamily: "var(--font-barlow)", fontSize: 14,
-              color: "rgba(255,255,255,0.45)", lineHeight: 1.6,
-              maxWidth: 220, marginBottom: 24,
-            }}>
-              Premium hookah experiences, curated flavours, and luxury rentals — wherever the vibe takes you.
-            </p>
-            <p style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: "clamp(10px, 2vw, 12px)",
-              color: "rgba(255,255,255,0.25)",
-              letterSpacing: "0.08em",
-              marginBottom: 16,
-            }}>
-              Made with smoke and obsession
-            </p>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {["Instagram", "TikTok", "X"].map((s) => (
-                <button key={s} style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: isMobile ? 11 : 12,
-                  letterSpacing: "0.1em", textTransform: "uppercase",
-                  color: "rgba(255,255,255,0.4)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  padding: "10px 14px", borderRadius: 6,
-                  background: "none", cursor: "pointer",
-                  transition: "color 0.2s, border-color 0.2s",
-                  minHeight: 44,
-                }}>
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Link columns */}
-          {Object.entries(FOOTER_LINKS).map(([heading, links]) => (
-            <div key={heading}>
-              <h4 style={{
-                fontFamily: "var(--font-barlow)", fontWeight: 700,
-                fontSize: 11, letterSpacing: "0.15em",
-                textTransform: "uppercase", color: "rgba(255,255,255,0.5)",
-                marginBottom: 16,
+              <p style={{
+                fontFamily: "var(--font-barlow)",
+                fontSize: 14,
+                color: "rgba(255,255,255,0.4)",
+                lineHeight: 1.65,
+                maxWidth: 240,
+                marginBottom: 28,
               }}>
-                {heading}
-              </h4>
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-                {links.map((link) => (
-                  <li key={link}>
-                    <a href="#" style={{
-                      fontFamily: "var(--font-barlow)", fontSize: 14,
-                      color: "rgba(255,255,255,0.5)",
+                Premium hookah experiences, curated flavours, and luxury rentals — wherever the vibe takes you.
+              </p>
+
+              {/* Social links */}
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {SOCIAL_LINKS.map(({ label, href, icon }) => (
+                  <a
+                    key={label}
+                    href={href}
+                    aria-label={label}
+                    className="footer-social-btn"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 7,
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 11,
+                      letterSpacing: "0.1em",
+                      color: "rgba(255,255,255,0.45)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      padding: "9px 13px",
+                      borderRadius: 8,
+                      background: "transparent",
                       textDecoration: "none",
-                      transition: "color 0.2s",
-                      display: "block",
-                      padding: "8px 0",
+                      cursor: "none",
                       minHeight: 44,
+                      transition: "color 0.2s, border-color 0.2s, background 0.2s",
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--teal)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.5)")}
+                  >
+                    {icon}
+                    <span>{label}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Col 2: Quick links ── */}
+            <div>
+              <h4 style={{
+                fontFamily: "var(--font-barlow)",
+                fontWeight: 700,
+                fontSize: 10,
+                letterSpacing: "0.2em",
+                textTransform: "uppercase",
+                color: "rgba(255,255,255,0.35)",
+                marginBottom: 20,
+              }}>
+                Navigate
+              </h4>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                {QUICK_LINKS.map(({ label, href }) => (
+                  <li key={label}>
+                    <button
+                      onClick={() => scrollTo(href)}
+                      className="footer-quick-link"
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "none",
+                        fontFamily: "var(--font-barlow)",
+                        fontSize: 14,
+                        color: "rgba(255,255,255,0.5)",
+                        textAlign: "left",
+                        padding: "9px 0",
+                        minHeight: 44,
+                        display: "block",
+                        width: "100%",
+                        transition: "color 0.2s",
+                        letterSpacing: "0.02em",
+                      }}
                     >
-                      {link}
-                    </a>
+                      {label}
+                    </button>
                   </li>
                 ))}
               </ul>
             </div>
-          ))}
-        </div>
 
-        {/* Bottom bar */}
-        <div style={{
-          borderTop: "1px solid rgba(255,255,255,0.06)",
-          padding: isMobile ? "20px 5vw" : "24px 5vw",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 12,
-        }}>
-          <p style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: "clamp(10px, 2vw, 12px)",
-            color: "rgba(255,255,255,0.25)", letterSpacing: "0.08em",
-          }}>
-            © 2024 Hookah™ · All rights reserved
-          </p>
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-            {["Privacy Policy", "Terms of Service", "Cookie Policy"].map((t) => (
-              <a key={t} href="#" style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "clamp(10px, 2vw, 12px)",
-                color: "rgba(255,255,255,0.25)", letterSpacing: "0.08em",
-                textDecoration: "none",
+            {/* ── Col 3: Contact + Newsletter ── */}
+            <div style={isMobile ? { gridColumn: "1 / -1" } : {}}>
+              <h4 style={{
+                fontFamily: "var(--font-barlow)",
+                fontWeight: 700,
+                fontSize: 10,
+                letterSpacing: "0.2em",
+                textTransform: "uppercase",
+                color: "rgba(255,255,255,0.35)",
+                marginBottom: 20,
               }}>
-                {t}
-              </a>
-            ))}
+                Contact
+              </h4>
+
+              {/* Contact info */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 32 }}>
+                <a
+                  href="mailto:hello@hkh.co"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 12,
+                    color: "rgba(255,255,255,0.45)",
+                    textDecoration: "none",
+                    letterSpacing: "0.05em",
+                    padding: "4px 0",
+                    transition: "color 0.2s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--cyan-bright)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.45)")}
+                >
+                  hello@hkh.co
+                </a>
+                <a
+                  href="tel:+254700000000"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 12,
+                    color: "rgba(255,255,255,0.45)",
+                    textDecoration: "none",
+                    letterSpacing: "0.05em",
+                    padding: "4px 0",
+                    transition: "color 0.2s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--cyan-bright)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.45)")}
+                >
+                  +254 700 000 000
+                </a>
+                <p style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 12,
+                  color: "rgba(255,255,255,0.3)",
+                  margin: 0,
+                  letterSpacing: "0.05em",
+                }}>
+                  Nairobi, Kenya
+                </p>
+              </div>
+
+              {/* Newsletter */}
+              <NewsletterForm />
+            </div>
+          </div>
+
+          {/* Bottom separator */}
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }} />
+
+          {/* Bottom bar */}
+          <div
+            style={{
+              padding: isMobile ? "20px 0" : "24px 0",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 12,
+            }}
+          >
+            <p style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "clamp(10px, 2vw, 12px)",
+              color: "rgba(255,255,255,0.2)",
+              letterSpacing: "0.08em",
+              margin: 0,
+            }}>
+              © 2026 HKH™ · All rights reserved
+            </p>
+
+            <p style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "clamp(10px, 2vw, 12px)",
+              color: "rgba(255,255,255,0.15)",
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+              margin: 0,
+            }}>
+              Built different.
+            </p>
+
+            <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+              {["Privacy", "Terms", "Cookies"].map((t) => (
+                <a
+                  key={t}
+                  href="#"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "clamp(10px, 2vw, 12px)",
+                    color: "rgba(255,255,255,0.2)",
+                    letterSpacing: "0.08em",
+                    textDecoration: "none",
+                    transition: "color 0.2s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.5)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.2)")}
+                >
+                  {t}
+                </a>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-    </footer>
+      </footer>
+    </>
   );
 }
