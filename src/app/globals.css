@@ -349,3 +349,9 @@ h1, h2, h3 {
 /* ── Scrollbar hide utility ───────────────────────────────────────── */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── FlavourWall CSS3D layer ─────────────────────────────────────── */
+/* Cards rendered by CSS3DRenderer live inside a transformed DOM subtree.
+   pointer-events must be explicitly restored since the renderer sets overflow:hidden. */
+.fw-card button { cursor: none !important; }
+.fw-card { will-change: transform, opacity; }
