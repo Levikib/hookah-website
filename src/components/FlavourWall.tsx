@@ -75,13 +75,14 @@ function helixPos(): Pos[] {
 }
 
 function gridPos(): Pos[] {
-  // 4×4×3 cuboid: 4 cols, 4 rows, 3 layers. 48 slots, use first 36.
-  const COLS   = 4;
-  const ROWS   = 4;
-  const LAYERS = 3;
-  const gapX = CARD_W + 28;
-  const gapY = CARD_H + 28;
-  const gapZ = 400;
+  // 6×3×2 cuboid: 6 cols, 3 rows per layer, 2 layers deep.
+  // 6×3×2 = 36 slots exactly — every card accessible.
+  // Layer z-gap 280px: visible depth without being unreachable.
+  const COLS   = 6;
+  const ROWS   = 3;
+  const gapX = CARD_W + 22;
+  const gapY = CARD_H + 22;
+  const gapZ = 280;
   const padX = ((COLS - 1) * gapX) / 2;
   const padY = ((ROWS - 1) * gapY) / 2;
 
@@ -90,11 +91,10 @@ function gridPos(): Pos[] {
     const rem   = i % (COLS * ROWS);
     const col   = rem % COLS;
     const row   = Math.floor(rem / COLS);
-    const safeLayer = Math.min(layer, LAYERS - 1);
     return {
       x:   col * gapX - padX,
       y:   row * gapY - padY,
-      z:  -safeLayer * gapZ,
+      z:  -layer * gapZ,
       rx:  0,
       ry:  0,
       rz:  0,
@@ -493,20 +493,24 @@ function FlavourCard({ flavour, onClick }, ref) {
 
         <div style={{ flex: 1 }} />
 
-        {/* Price + tap hint */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        {/* Price + CTA */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
           <span style={{
-            fontFamily: "var(--font-mono)", fontSize: 18,
-            fontWeight: 700, color: accent,
+            fontFamily: "var(--font-mono)", fontSize: 17,
+            fontWeight: 700, color: accent, flexShrink: 0,
           }}>
             ${flavour.price.toFixed(2)}
           </span>
           <span style={{
-            fontFamily: "var(--font-mono)", fontSize: 9,
-            letterSpacing: "0.1em", textTransform: "uppercase",
-            color: "rgba(255,255,255,0.25)",
+            fontFamily: "var(--font-barlow)", fontWeight: 700, fontSize: 10,
+            letterSpacing: "0.12em", textTransform: "uppercase",
+            padding: "6px 12px", borderRadius: 8,
+            border: `1px solid ${accent}`,
+            background: `${accent}22`,
+            color: accent,
+            whiteSpace: "nowrap",
           }}>
-            View →
+            View Details →
           </span>
         </div>
       </div>
@@ -534,6 +538,7 @@ export default function FlavourWall() {
   const targetOrbitRef = useRef({ x: 0, y: 0 });
   const velRef         = useRef({ x: 0, y: 0 });
   const isDragging     = useRef(false);
+  const pointerDownPos = useRef({ x: 0, y: 0 });
   const lastPointer    = useRef({ x: 0, y: 0 });
   const rafOrbit       = useRef<number>(0);
   const currentLayout  = useRef<Layout>("SPHERE");
@@ -668,20 +673,25 @@ export default function FlavourWall() {
 
   // ── Pointer handlers ──────────────────────────────────────────────────────
   const onPointerDown = useCallback((e: React.PointerEvent) => {
-    isDragging.current = true;
+    isDragging.current = false; // reset — only becomes true if we actually move
+    pointerDownPos.current = { x: e.clientX, y: e.clientY };
     lastPointer.current = { x: e.clientX, y: e.clientY };
     velRef.current = { x: 0, y: 0 };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }, []);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDragging.current) return;
-    const dx = e.clientX - lastPointer.current.x;
-    const dy = e.clientY - lastPointer.current.y;
-    velRef.current.y = dx * 0.25;
-    velRef.current.x = -dy * 0.18;
-    targetOrbitRef.current.y += dx * 0.25;
-    targetOrbitRef.current.x -= dy * 0.18;
+    const dx = e.clientX - pointerDownPos.current.x;
+    const dy = e.clientY - pointerDownPos.current.y;
+    // Only start orbit drag after moving 6px — preserves card click detection
+    if (!isDragging.current && Math.sqrt(dx*dx + dy*dy) < 6) return;
+    isDragging.current = true;
+    const mdx = e.clientX - lastPointer.current.x;
+    const mdy = e.clientY - lastPointer.current.y;
+    velRef.current.y = mdx * 0.25;
+    velRef.current.x = -mdy * 0.18;
+    targetOrbitRef.current.y += mdx * 0.25;
+    targetOrbitRef.current.x -= mdy * 0.18;
     lastPointer.current = { x: e.clientX, y: e.clientY };
   }, []);
 
@@ -713,7 +723,9 @@ export default function FlavourWall() {
     ["All", ...Array.from(new Set(FLAVOURS.map(f => f.category)))],
   []);
 
-  const stageH = isMobile ? 500 : 700;
+  // Sphere radius 500 → cards reach ±500px from center → need 1200px minimum.
+  // Extra headroom lets you orbit to top/bottom views without clipping.
+  const stageH = isMobile ? 700 : 1100;
 
   return (
     <section
@@ -850,7 +862,7 @@ export default function FlavourWall() {
           perspectiveOrigin: "50% 50%",
           cursor: isDragging.current ? "grabbing" : "grab",
           touchAction: "none",
-          marginTop: 24,
+          marginTop: 40,
           userSelect: "none",
         }}
       >
