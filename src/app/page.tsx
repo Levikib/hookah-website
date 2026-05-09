@@ -18,6 +18,7 @@ const FlavourWall = dynamic(() => import("@/components/FlavourWall"), { ssr: fal
 const SessionsSection = dynamic(() => import("@/components/SessionsSection"), { ssr: false });
 const RentalsSection = dynamic(() => import("@/components/RentalsSection"), { ssr: false });
 const FlavourShop = dynamic(() => import("@/components/FlavourShop"), { ssr: false });
+const PackageWizard = dynamic(() => import("@/components/PackageWizard"), { ssr: false });
 const Footer = dynamic(() => import("@/components/Footer"), { ssr: false });
 const BookingModal = dynamic(() => import("@/components/BookingModal"), { ssr: false });
 const CartDrawer = dynamic(() => import("@/components/CartDrawer"), { ssr: false });
@@ -371,7 +372,12 @@ export default function Home() {
       <FlavourShop />
 
       {/* ══════════════════════════════════════════════════════════════
-          S7: FOOTER
+          S7: PACKAGE WIZARD
+      ══════════════════════════════════════════════════════════════ */}
+      <PackageWizard />
+
+      {/* ══════════════════════════════════════════════════════════════
+          S8: FOOTER
       ══════════════════════════════════════════════════════════════ */}
       <Footer />
 

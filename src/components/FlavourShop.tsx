@@ -7,961 +7,772 @@ import gsap from "gsap";
 
 type Size = "50g" | "100g" | "250g";
 
-const SIZE_OPTIONS: { label: Size; mult: number }[] = [
-  { label: "50g", mult: 1 },
-  { label: "100g", mult: 1.7 },
-  { label: "250g", mult: 3.8 },
+const SIZE_OPTIONS: { label: Size; mult: number; desc: string }[] = [
+  { label: "50g",  mult: 1,   desc: "1–2 sessions" },
+  { label: "100g", mult: 1.7, desc: "3–5 sessions" },
+  { label: "250g", mult: 3.8, desc: "The stash"    },
 ];
 
 function calcPrice(base: number, size: Size): number {
   const opt = SIZE_OPTIONS.find((s) => s.label === size)!;
   return Math.round(base * opt.mult);
 }
+function kes(n: number) { return `KES ${n.toLocaleString("en-KE")}`; }
 
-function kes(amount: number) {
-  return `KES ${amount.toLocaleString("en-KE")}`;
+// ─── hex → rgb string ────────────────────────────────────────────────────────
+function hexRgb(hex: string) {
+  const h = hex.replace("#", "");
+  return `${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)}`;
 }
 
-// ── Animated glass jar ──────────────────────────────────────────────────────
-interface JarProps {
-  color: string;
-  stock: number;
-  isSelected: boolean;
-  isOut: boolean;
-  flavourName: string;
-}
-
-function GlassJar({ color, stock, isSelected, isOut, flavourName }: JarProps) {
+// ─── Animated jar SVG ────────────────────────────────────────────────────────
+function JarSVG({ color, stock, isSelected, isOut }: {
+  color: string; stock: number; isSelected: boolean; isOut: boolean;
+}) {
+  const rgb    = hexRgb(color);
   const status = getStockStatus(stock);
-  // Parse hex color to RGB for rgba usage
-  const hex = color.replace("#", "");
-  const r = parseInt(hex.slice(0, 2), 16);
-  const g = parseInt(hex.slice(2, 4), 16);
-  const b = parseInt(hex.slice(4, 6), 16);
-  const rgb = `${r},${g},${b}`;
+  const fillH  = isOut ? 0 : status === "critical" ? 28 : status === "low" ? 46 : 68;
 
-  // Bubble positions — seeded by name to be consistent per flavour
-  const bubbles = Array.from({ length: 8 }, (_, i) => ({
-    id: i,
-    x: 10 + (i * 37) % 74, // spread across jar width
-    size: 3 + (i * 13) % 6,
-    delay: (i * 0.38) % 2.4,
-    dur: 1.4 + (i * 0.23) % 1.2,
-  }));
+  const bubbles = [
+    { cx: 22, r: 2.5, delay: 0 },
+    { cx: 38, r: 1.8, delay: 0.6 },
+    { cx: 14, r: 1.5, delay: 1.1 },
+    { cx: 50, r: 2.2, delay: 0.3 },
+    { cx: 30, r: 1.4, delay: 1.7 },
+    { cx: 44, r: 1.8, delay: 0.9 },
+  ];
 
   return (
-    <div style={{ position: "relative", width: 80, height: 104, margin: "0 auto 10px", flexShrink: 0 }}>
-
-      {/* Glow halo behind jar */}
-      <div style={{
-        position: "absolute",
-        inset: -10,
-        borderRadius: "50%",
-        background: `radial-gradient(circle, rgba(${rgb},${isSelected ? 0.45 : 0.18}) 0%, transparent 70%)`,
-        transition: "background 0.4s ease",
-        pointerEvents: "none",
-        filter: "blur(6px)",
-      }} />
+    <svg
+      viewBox="0 0 66 100"
+      width="66" height="100"
+      style={{ overflow: "visible", filter: isSelected ? `drop-shadow(0 0 14px rgba(${rgb},0.8)) drop-shadow(0 0 28px rgba(${rgb},0.4))` : `drop-shadow(0 0 6px rgba(${rgb},0.35))`, transition: "filter 0.35s ease" }}
+    >
+      <defs>
+        <clipPath id={`jar-clip-${color.slice(1)}`}>
+          <rect x="5" y="30" width="56" height="66" rx="8" />
+        </clipPath>
+        <linearGradient id={`glass-${color.slice(1)}`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%"   stopColor="rgba(255,255,255,0.18)" />
+          <stop offset="40%"  stopColor="rgba(255,255,255,0.04)" />
+          <stop offset="100%" stopColor="rgba(255,255,255,0.08)" />
+        </linearGradient>
+        <linearGradient id={`liquid-${color.slice(1)}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor={`rgba(${rgb},0.55)`} />
+          <stop offset="100%" stopColor={`rgba(${rgb},0.85)`} />
+        </linearGradient>
+      </defs>
 
       {/* Lid */}
-      <div style={{
-        position: "absolute",
-        top: 0, left: "50%",
-        transform: "translateX(-50%)",
-        width: 42, height: 16,
-        borderRadius: "6px 6px 3px 3px",
-        background: isOut
-          ? "rgba(50,50,60,0.7)"
-          : `linear-gradient(to bottom, rgba(${rgb},0.9), rgba(${rgb},0.55))`,
-        border: `1px solid rgba(${rgb},${isOut ? 0.2 : 0.8})`,
-        boxShadow: isOut ? "none" : `0 0 12px rgba(${rgb},0.5), inset 0 1px 0 rgba(255,255,255,0.25)`,
-        zIndex: 3,
-        transition: "all 0.3s ease",
-      }}>
-        {/* Lid grip lines */}
-        {!isOut && [0,1,2].map(i => (
-          <div key={i} style={{
-            position: "absolute",
-            top: "50%", transform: "translateY(-50%)",
-            left: 8 + i * 9, width: 3, height: 8,
-            borderRadius: 2,
-            background: `rgba(255,255,255,0.3)`,
-          }} />
-        ))}
-      </div>
+      <rect x="18" y="6" width="30" height="14" rx="5"
+        fill={isOut ? "rgba(60,55,75,0.8)" : `rgba(${rgb},0.9)`}
+        stroke={`rgba(${rgb},${isOut ? 0.2 : 0.6})`} strokeWidth="1"
+      />
+      {/* Lid grip lines */}
+      {!isOut && [22,27,32,37].map(x => (
+        <rect key={x} x={x} y="9" width="2" height="8" rx="1" fill="rgba(255,255,255,0.28)" />
+      ))}
 
-      {/* Jar neck */}
-      <div style={{
-        position: "absolute",
-        top: 13, left: "50%",
-        transform: "translateX(-50%)",
-        width: 34, height: 8,
-        background: isOut ? "rgba(20,20,30,0.4)" : `rgba(${rgb},0.2)`,
-        border: `1px solid rgba(${rgb},${isOut ? 0.1 : 0.6})`,
-        borderBottom: "none",
-        zIndex: 2,
-      }} />
+      {/* Neck */}
+      <rect x="20" y="18" width="26" height="12" rx="2"
+        fill={`rgba(${rgb},${isOut ? 0.08 : 0.15})`}
+        stroke={`rgba(${rgb},${isOut ? 0.1 : 0.5})`} strokeWidth="1"
+      />
 
       {/* Jar body */}
-      <div style={{
-        position: "absolute",
-        top: 18, left: "50%",
-        transform: "translateX(-50%)",
-        width: 66, height: 82,
-        borderRadius: "6px 6px 16px 16px",
-        background: isOut
-          ? "rgba(20,20,30,0.35)"
-          : `linear-gradient(165deg, rgba(${rgb},0.22) 0%, rgba(${rgb},0.12) 40%, rgba(${rgb},0.08) 100%)`,
-        border: `2px solid rgba(${rgb},${isOut ? 0.12 : isSelected ? 0.9 : 0.65})`,
-        boxShadow: isOut ? "none" : isSelected
-          ? `0 0 32px rgba(${rgb},0.7), 0 0 60px rgba(${rgb},0.3), inset 0 0 30px rgba(${rgb},0.15)`
-          : `0 0 18px rgba(${rgb},0.4), inset 0 0 16px rgba(${rgb},0.08)`,
-        overflow: "hidden",
-        zIndex: 1,
-        transition: "all 0.35s ease",
-      }}>
+      <rect x="5" y="28" width="56" height="68" rx="9"
+        fill={`rgba(${rgb},${isOut ? 0.05 : 0.1})`}
+        stroke={`rgba(${rgb},${isOut ? 0.15 : isSelected ? 0.95 : 0.7})`}
+        strokeWidth={isSelected ? 2 : 1.5}
+      />
 
-        {/* Liquid fill */}
-        {!isOut && (
-          <div className="jar-liquid" style={{
-            position: "absolute",
-            bottom: 0, left: 0, right: 0,
-            height: status === "critical" ? "30%" : status === "low" ? "50%" : "72%",
-            background: `linear-gradient(to top, rgba(${rgb},0.75) 0%, rgba(${rgb},0.45) 60%, rgba(${rgb},0.15) 100%)`,
-            borderRadius: "0 0 14px 14px",
-            transition: "height 0.6s ease",
-          }}>
+      {/* Liquid fill */}
+      {!isOut && (
+        <g clipPath={`url(#jar-clip-${color.slice(1)})`}>
+          <rect
+            x="5" y={96 - fillH} width="56" height={fillH}
+            fill={`url(#liquid-${color.slice(1)})`}
+            style={{ transition: "all 0.6s ease" }}
+          >
+            {/* Slosh animation */}
+            <animate
+              attributeName="y"
+              values={`${96 - fillH};${96 - fillH - 2};${96 - fillH + 1};${96 - fillH}`}
+              dur="3.6s"
+              repeatCount="indefinite"
+              calcMode="spline"
+              keySplines="0.45 0 0.55 1;0.45 0 0.55 1;0.45 0 0.55 1"
+            />
+          </rect>
 
-            {/* Surface shimmer */}
-            <div style={{
-              position: "absolute",
-              top: 0, left: 0, right: 0,
-              height: 4,
-              background: `rgba(255,255,255,0.35)`,
-              borderRadius: 2,
-            }} />
+          {/* Surface shimmer */}
+          <rect x="5" y={95 - fillH} width="56" height="3" fill="rgba(255,255,255,0.3)" rx="1">
+            <animate attributeName="y" values={`${95 - fillH};${93 - fillH};${96 - fillH};${95 - fillH}`} dur="3.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.45 0 0.55 1;0.45 0 0.55 1;0.45 0 0.55 1" />
+          </rect>
 
-            {/* Bubbles */}
-            {bubbles.map(b => (
-              <div
-                key={b.id}
-                className="jar-bubble"
-                style={{
-                  position: "absolute",
-                  bottom: 4,
-                  left: b.x,
-                  width: b.size,
-                  height: b.size,
-                  borderRadius: "50%",
-                  background: `rgba(255,255,255,0.7)`,
-                  border: `1px solid rgba(255,255,255,0.4)`,
-                  animationDelay: `${b.delay}s`,
-                  animationDuration: `${b.dur}s`,
-                }}
+          {/* Bubbles */}
+          {bubbles.map((b, i) => (
+            <circle key={i} cx={b.cx} cy="88" r={b.r} fill="rgba(255,255,255,0.75)">
+              <animate
+                attributeName="cy"
+                values={`96;${96 - fillH - 4};96`}
+                dur={`${1.6 + i * 0.22}s`}
+                begin={`${b.delay}s`}
+                repeatCount="indefinite"
+                calcMode="spline"
+                keySplines="0.4 0 0.6 1;0.4 0 0.6 1"
               />
-            ))}
-          </div>
-        )}
-
-        {/* Glass shine — left vertical streak */}
-        <div style={{
-          position: "absolute",
-          top: 8, left: 7,
-          width: 5, height: 32,
-          borderRadius: 3,
-          background: "rgba(255,255,255,0.22)",
-          pointerEvents: "none",
-        }} />
-
-        {/* Glass shine — small dot */}
-        <div style={{
-          position: "absolute",
-          top: 10, right: 10,
-          width: 3, height: 10,
-          borderRadius: 2,
-          background: "rgba(255,255,255,0.12)",
-          pointerEvents: "none",
-        }} />
-
-        {/* Out of stock overlay */}
-        {isOut && (
-          <div style={{
-            position: "absolute", inset: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <span style={{
-              fontFamily: "var(--font-bebas)",
-              fontSize: 13, letterSpacing: "0.12em",
-              color: "rgba(120,110,140,0.55)",
-              transform: "rotate(-25deg)",
-              border: "2px solid rgba(120,110,140,0.2)",
-              padding: "2px 6px", borderRadius: 2,
-            }}>EMPTY</span>
-          </div>
-        )}
-
-        {/* Low stock warning strip */}
-        {(status === "critical") && !isOut && (
-          <div style={{
-            position: "absolute",
-            bottom: 0, left: 0, right: 0,
-            height: 20,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: "rgba(255,107,53,0.25)",
-            borderTop: "1px solid rgba(255,107,53,0.5)",
-          }}>
-            <span style={{
-              fontFamily: "var(--font-mono)", fontSize: 6,
-              letterSpacing: "0.12em", textTransform: "uppercase",
-              color: "#ff6b35",
-            }}>ALMOST GONE</span>
-          </div>
-        )}
-      </div>
-
-      {/* Selection ring pulse */}
-      {isSelected && !isOut && (
-        <div style={{
-          position: "absolute",
-          inset: -4, borderRadius: 20,
-          border: `2px solid rgba(${rgb},0.6)`,
-          animation: "ring-pulse 1.4s ease-in-out infinite",
-          pointerEvents: "none",
-        }} />
+              <animate
+                attributeName="opacity"
+                values="0.8;0.2;0"
+                dur={`${1.6 + i * 0.22}s`}
+                begin={`${b.delay}s`}
+                repeatCount="indefinite"
+              />
+              <animate
+                attributeName="r"
+                values={`${b.r};${b.r * 0.6};0`}
+                dur={`${1.6 + i * 0.22}s`}
+                begin={`${b.delay}s`}
+                repeatCount="indefinite"
+              />
+            </circle>
+          ))}
+        </g>
       )}
-    </div>
+
+      {/* Glass shine */}
+      <rect x="10" y="34" width="6" height="36" rx="3" fill="rgba(255,255,255,0.18)" />
+      <rect x="18" y="34" width="2" height="16" rx="1" fill="rgba(255,255,255,0.1)" />
+
+      {/* Glass body overlay (subtle depth) */}
+      <rect x="5" y="28" width="56" height="68" rx="9"
+        fill={`url(#glass-${color.slice(1)})`}
+        pointerEvents="none"
+      />
+
+      {/* Out of stock stamp */}
+      {isOut && (
+        <g transform="translate(33,62) rotate(-22)">
+          <rect x="-18" y="-10" width="36" height="20" rx="3" fill="none" stroke="rgba(140,130,160,0.3)" strokeWidth="1.5" />
+          <text textAnchor="middle" dominantBaseline="middle" fontFamily="var(--font-bebas)" fontSize="9" fill="rgba(140,130,160,0.4)" letterSpacing="1.5">EMPTY</text>
+        </g>
+      )}
+
+      {/* Low stock bar */}
+      {status === "critical" && !isOut && (
+        <rect x="5" y="90" width="56" height="6" rx="0 0 9 9" fill="rgba(255,107,53,0.4)" />
+      )}
+    </svg>
   );
 }
 
-// ── Individual shelf jar card ──────────────────────────────────────────────
-interface JarCardProps {
-  flavour: (typeof FLAVOURS)[0];
-  isSelected: boolean;
-  selectedSize: Size | null;
-  onJarClick: (id: number) => void;
-  onSizeSelect: (id: number, size: Size) => void;
-  onAddToBag: (id: number) => void;
-  isMobile: boolean;
-}
-
-function JarCard({
+// ─── Jar Detail Modal ─────────────────────────────────────────────────────────
+function JarModal({
   flavour,
-  isSelected,
-  selectedSize,
-  onJarClick,
-  onSizeSelect,
-  onAddToBag,
-  isMobile,
-}: JarCardProps) {
-  const jarRef = useRef<HTMLDivElement>(null);
+  onClose,
+  onAdd,
+}: {
+  flavour: (typeof FLAVOURS)[0];
+  onClose: () => void;
+  onAdd: (id: number, size: Size, price: number) => void;
+}) {
+  const rgb    = hexRgb(flavour.color);
   const status = getStockStatus(flavour.stock);
-  const isOut = status === "out";
-  const price = selectedSize ? calcPrice(flavour.price, selectedSize) : flavour.price;
+  const isOut  = status === "out";
+  const [size, setSize] = useState<Size>("50g");
+  const [added, setAdded] = useState(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const panelRef   = useRef<HTMLDivElement>(null);
 
-  const hex = flavour.color.replace("#", "");
-  const r = parseInt(hex.slice(0, 2), 16);
-  const g = parseInt(hex.slice(2, 4), 16);
-  const b = parseInt(hex.slice(4, 6), 16);
-  const rgb = `${r},${g},${b}`;
-
-  const handleMouseEnter = useCallback(() => {
-    if (isOut || !jarRef.current) return;
-    gsap.to(jarRef.current, { y: -14, duration: 0.3, ease: "power2.out" });
-  }, [isOut]);
-
-  const handleMouseLeave = useCallback(() => {
-    if (!jarRef.current) return;
-    gsap.to(jarRef.current, { y: 0, duration: 0.45, ease: "power2.inOut" });
+  useEffect(() => {
+    gsap.fromTo(overlayRef.current, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: "power2.out" });
+    gsap.fromTo(panelRef.current, { y: 48, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.4)" });
   }, []);
 
+  const close = useCallback(() => {
+    gsap.to(overlayRef.current, { opacity: 0, duration: 0.2 });
+    gsap.to(panelRef.current, { y: 32, opacity: 0, scale: 0.95, duration: 0.2, onComplete: onClose });
+  }, [onClose]);
+
+  const handleAdd = () => {
+    if (isOut || added) return;
+    const price = calcPrice(flavour.price, size);
+    onAdd(flavour.id, size, price);
+    setAdded(true);
+    setTimeout(() => { setAdded(false); close(); }, 1000);
+  };
+
+  const price = calcPrice(flavour.price, size);
+
   return (
-    <div style={{
-      display: "flex", flexDirection: "column", alignItems: "center",
-      position: "relative",
-      opacity: isOut ? 0.45 : 1,
-      transition: "opacity 0.3s ease",
-    }}>
-
-      {/* Jar + hover tooltip */}
+    <div
+      ref={overlayRef}
+      onClick={(e) => e.target === overlayRef.current && close()}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1100,
+        background: "rgba(4,2,10,0.82)",
+        backdropFilter: "blur(14px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 20,
+      }}
+    >
       <div
-        style={{ position: "relative", width: "100%" }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        onClick={() => !isOut && onJarClick(flavour.id)}
+        ref={panelRef}
+        style={{
+          width: "min(580px, 96vw)",
+          background: "linear-gradient(160deg, #0d0a1e 0%, #110d28 60%, #0a0818 100%)",
+          border: `1.5px solid rgba(${rgb},0.5)`,
+          borderRadius: 20,
+          overflow: "hidden",
+          boxShadow: `0 0 0 1px rgba(${rgb},0.15), 0 32px 80px rgba(0,0,0,0.85), 0 0 60px rgba(${rgb},0.12)`,
+          position: "relative",
+        }}
       >
-        <div ref={jarRef} className="jar-breathe" style={{ willChange: "transform" }}>
-          <GlassJar
-            color={flavour.color}
-            stock={flavour.stock}
-            isSelected={isSelected}
-            isOut={isOut}
-            flavourName={flavour.name}
-          />
-        </div>
+        {/* Top accent line */}
+        <div style={{ height: 3, background: `linear-gradient(to right, transparent, rgba(${rgb},1), transparent)` }} />
 
-        {/* Desktop tooltip */}
-        {!isMobile && !isOut && (
-          <div className="jar-tooltip">
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.12em", color: flavour.color, textTransform: "uppercase" }}>
-              {flavour.category}
-            </span>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "rgba(255,255,255,0.6)", letterSpacing: "0.06em" }}>
-              {flavour.intensity} intensity
-            </span>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--gold)", fontWeight: 700 }}>
-              {kes(flavour.price)} / 50g
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Name + price */}
-      <div style={{ textAlign: "center", marginBottom: 6, padding: "0 2px" }}>
-        <div style={{
-          fontFamily: "var(--font-bebas)",
-          fontSize: isMobile ? 13 : 15,
-          letterSpacing: "0.04em",
-          color: isOut ? "rgba(140,130,160,0.5)" : "#f0f2fa",
-          lineHeight: 1.1,
-          maxWidth: isMobile ? 74 : 92,
-          textShadow: isOut ? "none" : `0 0 12px rgba(${rgb},0.6)`,
-        }}>
-          {flavour.name}
-        </div>
-        <div style={{
-          fontFamily: "var(--font-mono)", fontSize: 10,
-          color: isOut ? "rgba(120,110,140,0.4)" : "var(--gold)",
-          letterSpacing: "0.06em", marginTop: 2,
-        }}>
-          {kes(flavour.price)}
-        </div>
-      </div>
-
-      {/* Expanded size selector — appears on click */}
-      {isSelected && !isOut && (
-        <div
-          className="jar-size-panel"
+        {/* Close */}
+        <button
+          onClick={close}
           style={{
-            position: "absolute",
-            top: "100%",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 30,
-            background: `linear-gradient(145deg, rgba(8,5,22,0.98), rgba(16,10,36,0.98))`,
-            border: `1px solid rgba(${rgb},0.6)`,
-            borderTop: `2px solid rgba(${rgb},0.9)`,
-            borderRadius: 12,
-            padding: "12px 14px",
-            width: isMobile ? 168 : 190,
-            boxShadow: `0 16px 48px rgba(0,0,0,0.8), 0 0 30px rgba(${rgb},0.25)`,
-            marginTop: 6,
+            position: "absolute", top: 16, right: 16, zIndex: 10,
+            width: 36, height: 36, borderRadius: "50%",
+            border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(255,255,255,0.05)",
+            color: "rgba(255,255,255,0.6)", fontSize: 20, lineHeight: 1,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer",
           }}
-        >
-          {/* Flavour notes */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginBottom: 10 }}>
-            {flavour.notes.slice(0, 3).map((note) => (
-              <span key={note} style={{
-                fontFamily: "var(--font-mono)", fontSize: 8,
-                letterSpacing: "0.08em",
-                padding: "2px 6px", borderRadius: 20,
-                background: `rgba(${rgb},0.12)`,
-                border: `1px solid rgba(${rgb},0.3)`,
-                color: flavour.color,
-                textTransform: "uppercase",
-              }}>
-                {note}
-              </span>
+        >×</button>
+
+        {/* Hero row — jar + identity */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 24,
+          padding: "28px 32px 20px",
+          borderBottom: `1px solid rgba(${rgb},0.15)`,
+        }}>
+          <div style={{ flexShrink: 0 }}>
+            <JarSVG color={flavour.color} stock={flavour.stock} isSelected={true} isOut={isOut} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Category + intensity badges */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+              <span style={{
+                fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.16em",
+                padding: "3px 10px", borderRadius: 20,
+                border: `1px solid rgba(${rgb},0.6)`, color: flavour.color,
+                background: `rgba(${rgb},0.12)`, textTransform: "uppercase",
+              }}>{flavour.category}</span>
+              <span style={{
+                fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.12em",
+                padding: "3px 10px", borderRadius: 20,
+                border: "1px solid rgba(255,255,255,0.12)",
+                color: "rgba(255,255,255,0.5)", textTransform: "uppercase",
+              }}>{flavour.intensity}</span>
+              {status !== "normal" && (
+                <span style={{
+                  fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.12em",
+                  padding: "3px 10px", borderRadius: 20, textTransform: "uppercase",
+                  border: `1px solid ${isOut ? "rgba(255,255,255,0.1)" : "rgba(255,107,53,0.5)"}`,
+                  color: isOut ? "rgba(180,170,200,0.4)" : "#ff6b35",
+                  background: isOut ? "transparent" : "rgba(255,107,53,0.08)",
+                }}>{isOut ? "Sold Out" : status === "critical" ? "Almost Gone" : "Low Stock"}</span>
+              )}
+            </div>
+            <h2 style={{
+              fontFamily: "var(--font-bebas)", fontSize: 38,
+              letterSpacing: "0.04em", textTransform: "uppercase",
+              color: "#f0f2fa", lineHeight: 1, marginBottom: 8,
+            }}>{flavour.name} <span style={{ fontSize: 32 }}>{flavour.emoji}</span></h2>
+            <p style={{
+              fontFamily: "var(--font-serif)", fontStyle: "italic",
+              fontSize: 15, lineHeight: 1.6,
+              color: "rgba(240,235,255,0.65)",
+            }}>{flavour.description}</p>
+          </div>
+        </div>
+
+        {/* Flavour notes */}
+        <div style={{ padding: "18px 32px", borderBottom: `1px solid rgba(${rgb},0.1)` }}>
+          <p style={{
+            fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.22em",
+            textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: 10,
+          }}>Tasting Notes</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {flavour.notes.map(n => (
+              <span key={n} style={{
+                fontFamily: "var(--font-barlow)", fontWeight: 600, fontSize: 13,
+                padding: "5px 14px", borderRadius: 24,
+                background: `rgba(${rgb},0.1)`,
+                border: `1px solid rgba(${rgb},0.28)`,
+                color: "#e8e4f4",
+              }}>{n}</span>
             ))}
           </div>
+          {flavour.pairsWith.length > 0 && (
+            <div style={{ marginTop: 12, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)" }}>Pairs with</span>
+              {flavour.pairsWith.map(p => (
+                <span key={p} style={{
+                  fontFamily: "var(--font-barlow)", fontSize: 11,
+                  padding: "3px 10px", borderRadius: 20,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  color: "rgba(220,215,240,0.5)",
+                }}>+ {p}</span>
+              ))}
+            </div>
+          )}
+        </div>
 
-          {/* Size pills */}
-          <div style={{ display: "flex", gap: 4, marginBottom: 10 }}>
-            {SIZE_OPTIONS.map(({ label }) => {
+        {/* Size + CTA */}
+        <div style={{ padding: "20px 32px 28px" }}>
+          <p style={{
+            fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.22em",
+            textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: 12,
+          }}>Choose your quantity</p>
+
+          <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+            {SIZE_OPTIONS.map(({ label, desc }) => {
               const szPrice = calcPrice(flavour.price, label);
-              const isActive = selectedSize === label;
+              const active  = size === label;
               return (
                 <button
                   key={label}
-                  onClick={(e) => { e.stopPropagation(); onSizeSelect(flavour.id, label); }}
+                  onClick={() => setSize(label)}
                   style={{
-                    flex: 1, padding: "5px 0", borderRadius: 20,
-                    border: isActive ? `1px solid rgba(${rgb},0.9)` : "1px solid rgba(255,255,255,0.12)",
-                    background: isActive ? `rgba(${rgb},0.22)` : "rgba(255,255,255,0.03)",
-                    color: isActive ? flavour.color : "rgba(255,255,255,0.45)",
-                    fontFamily: "var(--font-mono)", fontSize: 9,
-                    letterSpacing: "0.05em", cursor: "pointer",
-                    transition: "all 0.15s ease", textAlign: "center",
-                    boxShadow: isActive ? `0 0 10px rgba(${rgb},0.3)` : "none",
+                    flex: 1, padding: "12px 8px", borderRadius: 12,
+                    border: active ? `1.5px solid rgba(${rgb},0.9)` : "1.5px solid rgba(255,255,255,0.1)",
+                    background: active ? `rgba(${rgb},0.16)` : "rgba(255,255,255,0.03)",
+                    cursor: "pointer", transition: "all 0.18s ease",
+                    boxShadow: active ? `0 0 18px rgba(${rgb},0.25)` : "none",
+                    textAlign: "center",
                   }}
                 >
-                  <div style={{ fontWeight: 700 }}>{label}</div>
-                  <div style={{ opacity: 0.7, fontSize: 8 }}>{kes(szPrice)}</div>
+                  <div style={{ fontFamily: "var(--font-bebas)", fontSize: 20, letterSpacing: "0.08em", color: active ? flavour.color : "rgba(255,255,255,0.5)" }}>{label}</div>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.1em", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", marginTop: 3 }}>{desc}</div>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 700, color: active ? flavour.color : "rgba(255,255,255,0.35)", marginTop: 4 }}>{kes(szPrice)}</div>
                 </button>
               );
             })}
           </div>
 
-          {/* Add to bag CTA */}
-          {selectedSize && (
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <button
-              onClick={(e) => { e.stopPropagation(); onAddToBag(flavour.id); }}
+              onClick={close}
               style={{
-                width: "100%", padding: "9px 0", borderRadius: 8,
-                border: `1px solid rgba(${rgb},0.7)`,
-                background: `linear-gradient(135deg, rgba(${rgb},0.28), rgba(${rgb},0.14))`,
-                color: flavour.color,
-                fontFamily: "var(--font-bebas)", fontSize: 15,
-                letterSpacing: "0.14em", cursor: "pointer",
-                transition: "all 0.2s ease", textAlign: "center",
-                boxShadow: `0 4px 20px rgba(${rgb},0.2)`,
+                padding: "13px 20px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)",
+                background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.4)",
+                fontFamily: "var(--font-barlow)", fontWeight: 700, fontSize: 12,
+                letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer",
               }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = `rgba(${rgb},0.38)`;
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 6px 24px rgba(${rgb},0.45)`;
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = `linear-gradient(135deg, rgba(${rgb},0.28), rgba(${rgb},0.14))`;
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 4px 20px rgba(${rgb},0.2)`;
+            >Back</button>
+            <button
+              onClick={handleAdd}
+              disabled={isOut}
+              style={{
+                flex: 1, padding: "13px 0", borderRadius: 10,
+                border: `1.5px solid rgba(${rgb},${isOut ? 0.2 : 0.8})`,
+                background: added
+                  ? `rgba(${rgb},0.9)`
+                  : isOut
+                  ? "rgba(255,255,255,0.04)"
+                  : `rgba(${rgb},0.18)`,
+                color: added ? "#0a0818" : isOut ? "rgba(180,170,200,0.3)" : flavour.color,
+                fontFamily: "var(--font-bebas)", fontSize: 18,
+                letterSpacing: "0.12em", cursor: isOut ? "not-allowed" : "pointer",
+                transition: "all 0.22s ease",
+                boxShadow: added ? `0 0 28px rgba(${rgb},0.6)` : `0 0 0px rgba(${rgb},0)`,
               }}
             >
-              DISPENSE {kes(price)} →
+              {isOut ? "OUT OF STOCK" : added ? `✓ ADDED — ${kes(price)}` : `ADD TO BAG — ${kes(price)}`}
             </button>
-          )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
-// ── Shelf row ──────────────────────────────────────────────────────────────
-interface ShelfRowProps {
-  jars: (typeof FLAVOURS)[0][];
-  rowIndex: number;
-  selectedJar: number | null;
-  selectedSizes: Record<number, Size>;
-  onJarClick: (id: number) => void;
-  onSizeSelect: (id: number, size: Size) => void;
-  onAddToBag: (id: number) => void;
+// ─── Jar card on shelf ────────────────────────────────────────────────────────
+function JarCard({ flavour, onOpen, isMobile }: {
+  flavour: (typeof FLAVOURS)[0];
+  onOpen: () => void;
   isMobile: boolean;
-}
+}) {
+  const jarRef = useRef<HTMLDivElement>(null);
+  const status = getStockStatus(flavour.stock);
+  const isOut  = status === "out";
+  const rgb    = hexRgb(flavour.color);
 
-function ShelfRow({ jars, rowIndex, selectedJar, selectedSizes, onJarClick, onSizeSelect, onAddToBag, isMobile }: ShelfRowProps) {
-  const depthScale = 1 - rowIndex * 0.025;
-  const depthOpacity = 1 - rowIndex * 0.04;
+  const onEnter = useCallback(() => {
+    if (isOut || !jarRef.current) return;
+    gsap.to(jarRef.current, { y: -14, duration: 0.3, ease: "power2.out" });
+  }, [isOut]);
+  const onLeave = useCallback(() => {
+    if (!jarRef.current) return;
+    gsap.to(jarRef.current, { y: 0, duration: 0.4, ease: "power2.inOut" });
+  }, []);
 
   return (
     <div
-      className="shelf-row"
-      data-row={rowIndex}
       style={{
-        position: "relative",
-        marginBottom: isMobile ? 52 : 68,
-        transform: `scale(${depthScale})`,
-        transformOrigin: "center bottom",
-        opacity: depthOpacity,
+        display: "flex", flexDirection: "column", alignItems: "center",
+        opacity: isOut ? 0.42 : 1, transition: "opacity 0.3s ease",
+        cursor: isOut ? "not-allowed" : "pointer",
       }}
     >
-      {/* Under-shelf amber glow — simulates warm display lighting */}
+      <div
+        style={{ position: "relative" }}
+        onMouseEnter={onEnter}
+        onMouseLeave={onLeave}
+        onClick={() => !isOut && onOpen()}
+      >
+        <div ref={jarRef} className="jar-breathe" style={{ willChange: "transform" }}>
+          <JarSVG color={flavour.color} stock={flavour.stock} isSelected={false} isOut={isOut} />
+        </div>
+
+        {/* Desktop tooltip */}
+        {!isMobile && !isOut && (
+          <div className="jar-tooltip">
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: flavour.color, letterSpacing: "0.12em", textTransform: "uppercase" }}>{flavour.category}</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "rgba(255,255,255,0.55)" }}>{flavour.intensity} intensity</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--gold)", fontWeight: 700 }}>{kes(flavour.price)} / 50g</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>click to select →</span>
+          </div>
+        )}
+      </div>
+
+      {/* Name */}
       <div style={{
-        position: "absolute",
-        bottom: 18, left: "5%", right: "5%",
-        height: 60,
-        background: "radial-gradient(ellipse 90% 100% at 50% 100%, rgba(245,158,11,0.18) 0%, transparent 100%)",
-        pointerEvents: "none", zIndex: 0,
-        filter: "blur(8px)",
+        fontFamily: "var(--font-bebas)", fontSize: isMobile ? 12 : 14,
+        letterSpacing: "0.04em", textAlign: "center",
+        color: isOut ? "rgba(140,130,160,0.4)" : "#f0f2fa",
+        lineHeight: 1.1, maxWidth: isMobile ? 72 : 90,
+        marginTop: 4,
+        textShadow: isOut ? "none" : `0 0 10px rgba(${rgb},0.5)`,
+      }}>{flavour.name}</div>
+      <div style={{
+        fontFamily: "var(--font-mono)", fontSize: 9,
+        color: isOut ? "rgba(120,110,140,0.35)" : "rgba(200,150,70,0.8)",
+        letterSpacing: "0.06em", marginTop: 3,
+      }}>{kes(flavour.price)}</div>
+    </div>
+  );
+}
+
+// ─── Shelf row ────────────────────────────────────────────────────────────────
+function ShelfRow({ jars, rowIndex, onOpen, isMobile }: {
+  jars: (typeof FLAVOURS)[0][];
+  rowIndex: number;
+  onOpen: (f: (typeof FLAVOURS)[0]) => void;
+  isMobile: boolean;
+}) {
+  const scale   = 1 - rowIndex * 0.025;
+  const opacity = 1 - rowIndex * 0.04;
+
+  return (
+    <div className="shelf-row" data-row={rowIndex} style={{
+      position: "relative",
+      marginBottom: isMobile ? 52 : 64,
+      transform: `scale(${scale})`,
+      transformOrigin: "center bottom",
+      opacity,
+    }}>
+      {/* Amber under-shelf glow */}
+      <div style={{
+        position: "absolute", bottom: 18, left: "8%", right: "8%", height: 50,
+        background: "radial-gradient(ellipse 90% 100% at 50% 100%, rgba(245,158,11,0.16) 0%, transparent 100%)",
+        pointerEvents: "none", zIndex: 0, filter: "blur(6px)",
       }} />
 
-      {/* Jars row */}
+      {/* Jar row */}
       <div style={{
         display: "flex", justifyContent: "center",
-        gap: isMobile ? 10 : 20,
-        paddingBottom: isMobile ? 20 : 28,
-        paddingTop: isMobile ? 10 : 16,
+        gap: isMobile ? 10 : 22,
+        paddingBottom: isMobile ? 20 : 26, paddingTop: isMobile ? 10 : 16,
         position: "relative", zIndex: 1,
         flexWrap: isMobile ? "wrap" : "nowrap",
         minHeight: isMobile ? undefined : 150,
       }}>
-        {jars.map((f) => (
+        {jars.map(f => (
           <div
             key={f.id}
             className="jar-cell"
             data-flavour={f.id}
             style={{
               flex: isMobile ? "0 0 calc(33% - 8px)" : "1 1 0",
-              maxWidth: isMobile ? "calc(33% - 8px)" : 116,
+              maxWidth: isMobile ? "calc(33% - 8px)" : 120,
               minWidth: isMobile ? 80 : 84,
             }}
           >
-            <JarCard
-              flavour={f}
-              isSelected={selectedJar === f.id}
-              selectedSize={selectedJar === f.id ? (selectedSizes[f.id] ?? null) : null}
-              onJarClick={onJarClick}
-              onSizeSelect={onSizeSelect}
-              onAddToBag={onAddToBag}
-              isMobile={isMobile}
-            />
+            <JarCard flavour={f} onOpen={() => onOpen(f)} isMobile={isMobile} />
           </div>
         ))}
       </div>
 
-      {/* Wooden shelf plank */}
+      {/* Wooden shelf */}
       <div style={{
-        position: "relative",
         height: isMobile ? 14 : 20,
         borderRadius: "0 0 4px 4px",
         background: "repeating-linear-gradient(90deg, rgba(101,67,33,0.9) 0px, rgba(128,85,42,0.95) 40px, rgba(90,58,26,0.88) 80px, rgba(115,76,36,0.92) 120px)",
         borderTop: "2px solid rgba(180,130,60,0.6)",
         borderBottom: "1px solid rgba(40,22,6,0.9)",
-        boxShadow: "0 6px 20px rgba(0,0,0,0.65), 0 2px 6px rgba(0,0,0,0.5), inset 0 1px 0 rgba(220,170,80,0.25)",
-        zIndex: 2,
+        boxShadow: "0 6px 20px rgba(0,0,0,0.65), inset 0 1px 0 rgba(220,170,80,0.25)",
+        position: "relative", zIndex: 2,
       }} />
     </div>
   );
 }
 
-// ── Dispensary counter bar ─────────────────────────────────────────────────
-function CounterBar({ cartCount, cartTotal, onViewBag }: { cartCount: number; cartTotal: number; onViewBag: () => void }) {
+// ─── Counter bar ──────────────────────────────────────────────────────────────
+function CounterBar({ count, total, onView }: { count: number; total: number; onView: () => void }) {
   return (
     <div style={{
-      position: "sticky", bottom: 0, left: 0, right: 0, zIndex: 20,
+      position: "sticky", bottom: 0, zIndex: 20,
       display: "flex", alignItems: "center", justifyContent: "space-between",
       gap: 12, padding: "14px 28px",
-      background: "linear-gradient(to right, rgba(24,14,6,0.98), rgba(38,22,8,0.98), rgba(24,14,6,0.98))",
-      borderTop: "1px solid rgba(180,130,60,0.45)",
-      boxShadow: "0 -6px 32px rgba(0,0,0,0.75), inset 0 1px 0 rgba(220,170,80,0.15)",
+      background: "linear-gradient(to right, rgba(18,10,5,0.98), rgba(32,20,8,0.98), rgba(18,10,5,0.98))",
+      borderTop: "1px solid rgba(180,130,60,0.4)",
+      boxShadow: "0 -6px 32px rgba(0,0,0,0.8)",
       backdropFilter: "blur(12px)",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-        {/* Beaker */}
-        <div className="counter-beaker" aria-hidden="true" />
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="counter-beaker" />
         <div>
-          <div style={{
-            fontFamily: "var(--font-bebas)", fontSize: 10,
-            letterSpacing: "0.25em", color: "rgba(200,150,70,0.55)",
-            textTransform: "uppercase",
-          }}>
-            Formulary Counter · Premium Compounds
+          <div style={{ fontFamily: "var(--font-bebas)", fontSize: 10, letterSpacing: "0.25em", color: "rgba(200,150,70,0.5)", textTransform: "uppercase" }}>
+            The Lab Counter · Sourced Globally
           </div>
-          <div style={{
-            fontFamily: "var(--font-mono)", fontSize: 13,
-            color: "#f0f2fa", letterSpacing: "0.04em",
-          }}>
-            {cartCount === 0
-              ? "No compounds prescribed yet"
-              : `${cartCount} compound${cartCount !== 1 ? "s" : ""} in your formula · `}
-            {cartCount > 0 && (
-              <span style={{ color: "var(--gold)", fontWeight: 700 }}>
-                {kes(cartTotal)}
-              </span>
-            )}
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "#f0f2fa", letterSpacing: "0.04em" }}>
+            {count === 0 ? "No compounds selected yet" : `${count} compound${count !== 1 ? "s" : ""} in your bag · `}
+            {count > 0 && <span style={{ color: "var(--gold)", fontWeight: 700 }}>{kes(total)}</span>}
           </div>
         </div>
       </div>
       <button
-        onClick={onViewBag}
-        disabled={cartCount === 0}
+        onClick={onView}
+        disabled={count === 0}
         style={{
           padding: "9px 22px", borderRadius: 8,
-          border: "1px solid rgba(200,150,70,0.55)",
-          background: cartCount > 0
-            ? "linear-gradient(135deg, rgba(200,150,50,0.22), rgba(160,110,30,0.16))"
-            : "rgba(255,255,255,0.04)",
-          color: cartCount > 0 ? "var(--gold)" : "rgba(140,130,150,0.5)",
-          fontFamily: "var(--font-bebas)", fontSize: 14,
-          letterSpacing: "0.14em", cursor: cartCount > 0 ? "pointer" : "not-allowed",
-          opacity: cartCount > 0 ? 1 : 0.4,
-          transition: "all 0.2s ease", flexShrink: 0, whiteSpace: "nowrap",
-        }}
-        onMouseEnter={(e) => {
-          if (cartCount > 0) {
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 20px rgba(200,150,50,0.35)";
-            (e.currentTarget as HTMLButtonElement).style.background = "linear-gradient(135deg, rgba(200,150,50,0.32), rgba(160,110,30,0.24))";
-          }
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
-          if (cartCount > 0) {
-            (e.currentTarget as HTMLButtonElement).style.background = "linear-gradient(135deg, rgba(200,150,50,0.22), rgba(160,110,30,0.16))";
-          }
+          border: "1px solid rgba(200,150,70,0.5)",
+          background: count > 0 ? "rgba(180,120,40,0.22)" : "rgba(255,255,255,0.03)",
+          color: count > 0 ? "var(--gold)" : "rgba(140,130,150,0.4)",
+          fontFamily: "var(--font-bebas)", fontSize: 14, letterSpacing: "0.14em",
+          cursor: count > 0 ? "pointer" : "not-allowed",
+          opacity: count > 0 ? 1 : 0.4, transition: "all 0.2s ease", whiteSpace: "nowrap",
         }}
       >
-        Review Formula →
+        View Bag →
       </button>
     </div>
   );
 }
 
-// ── Marketing header copy ──────────────────────────────────────────────────
-const MARKETING_LINES = [
-  "Every cloud starts with the right compound.",
-  "Sourced globally. Dispensed precisely.",
+// ─── Cycling taglines ─────────────────────────────────────────────────────────
+const TAGLINES = [
+  "Every session deserves the right compound.",
   "36 rare blends. Zero compromises.",
-  "The pharmacist never misses.",
+  "Sourced globally. Stocked for you.",
+  "The perfect blend doesn't find itself.",
 ];
 
-// ── Main dispensary section ────────────────────────────────────────────────
+// ─── Main section ─────────────────────────────────────────────────────────────
 export default function FlavourShop() {
-  const [activeCategory, setActiveCategory] = useState<string>("All");
-  const [selectedJar, setSelectedJar] = useState<number | null>(null);
-  const [selectedSizes, setSelectedSizes] = useState<Record<number, Size>>({});
-  const [marketingIdx, setMarketingIdx] = useState(0);
-  const sectionRef = useRef<HTMLDivElement>(null);
-  const shelvesAreaRef = useRef<HTMLDivElement>(null);
-  const isMobile = useIsMobile();
+  const [activeCategory, setActiveCategory] = useState("All");
+  const [modalFlavour, setModalFlavour]     = useState<(typeof FLAVOURS)[0] | null>(null);
+  const [taglineIdx, setTaglineIdx]         = useState(0);
+  const sectionRef    = useRef<HTMLDivElement>(null);
+  const shelvesRef    = useRef<HTMLDivElement>(null);
+  const isMobile      = useIsMobile();
+  const addToCart     = useStore(s => s.addToCart);
+  const setCartOpen   = useStore(s => s.setCartOpen);
+  const cartTotal     = useStore(s => s.cartTotal);
+  const cartCount     = useStore(s => s.cartCount);
 
-  const addToCart = useStore((s) => s.addToCart);
-  const setCartOpen = useStore((s) => s.setCartOpen);
-  const cartTotal = useStore((s) => s.cartTotal);
-  const cartCount = useStore((s) => s.cartCount);
-
-  const totalVal = cartTotal();
+  const totalVal   = cartTotal();
   const totalCount = cartCount();
 
-  const filtered = activeCategory === "All" ? FLAVOURS : FLAVOURS.filter((f) => f.category === activeCategory);
+  const filtered = activeCategory === "All" ? FLAVOURS : FLAVOURS.filter(f => f.category === activeCategory);
   const shelves: (typeof FLAVOURS)[] = [];
   for (let i = 0; i < filtered.length; i += 6) shelves.push(filtered.slice(i, i + 6));
 
-  // Cycle marketing taglines
+  // Tagline cycle
   useEffect(() => {
-    const t = setInterval(() => setMarketingIdx(i => (i + 1) % MARKETING_LINES.length), 3800);
+    const t = setInterval(() => setTaglineIdx(i => (i + 1) % TAGLINES.length), 3800);
     return () => clearInterval(t);
   }, []);
 
   // Entrance animation
   useEffect(() => {
     if (!sectionRef.current) return;
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        observer.disconnect();
-        const shelfRows = sectionRef.current!.querySelectorAll(".shelf-row");
-        gsap.fromTo(shelfRows, { x: -80, opacity: 0 }, { x: 0, opacity: 1, duration: 0.7, stagger: 0.14, ease: "power3.out", delay: 0.1 });
-        const jarCells = sectionRef.current!.querySelectorAll(".jar-cell");
-        gsap.fromTo(jarCells, { y: -50, opacity: 0, scale: 0.8 }, { y: 0, opacity: 1, scale: 1, duration: 0.6, stagger: 0.04, ease: "bounce.out", delay: 0.3 });
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        obs.disconnect();
+        const rows = sectionRef.current!.querySelectorAll(".shelf-row");
+        gsap.fromTo(rows, { x: -80, opacity: 0 }, { x: 0, opacity: 1, duration: 0.7, stagger: 0.13, ease: "power3.out", delay: 0.1 });
+        const cells = sectionRef.current!.querySelectorAll(".jar-cell");
+        gsap.fromTo(cells, { y: -50, opacity: 0, scale: 0.8 }, { y: 0, opacity: 1, scale: 1, duration: 0.55, stagger: 0.04, ease: "bounce.out", delay: 0.28 });
         setTimeout(() => {
-          const jarWrappers = sectionRef.current!.querySelectorAll(".jar-breathe");
-          jarWrappers.forEach((el) => {
-            gsap.to(el, { scale: 1.025, duration: 2.5 + Math.random() * 2, repeat: -1, yoyo: true, ease: "sine.inOut", delay: Math.random() * 3 });
+          sectionRef.current!.querySelectorAll(".jar-breathe").forEach(el => {
+            gsap.to(el, { scale: 1.022, duration: 2.5 + Math.random() * 2, repeat: -1, yoyo: true, ease: "sine.inOut", delay: Math.random() * 3 });
           });
         }, 900);
       });
-    }, { threshold: 0.12 });
-    observer.observe(sectionRef.current);
-    return () => observer.disconnect();
+    }, { threshold: 0.1 });
+    obs.observe(sectionRef.current);
+    return () => obs.disconnect();
   }, []);
 
   // Re-animate on category change
   useEffect(() => {
-    if (!shelvesAreaRef.current) return;
-    const jarCells = shelvesAreaRef.current.querySelectorAll(".jar-cell");
-    gsap.fromTo(jarCells, { opacity: 0, scale: 0.8, y: -24 }, { opacity: 1, scale: 1, y: 0, duration: 0.4, stagger: 0.04, ease: "power2.out" });
+    if (!shelvesRef.current) return;
+    const cells = shelvesRef.current.querySelectorAll(".jar-cell");
+    gsap.fromTo(cells, { opacity: 0, scale: 0.8, y: -22 }, { opacity: 1, scale: 1, y: 0, duration: 0.38, stagger: 0.035, ease: "power2.out" });
   }, [activeCategory]);
 
-  const handleJarClick = useCallback((id: number) => {
-    setSelectedJar((prev) => (prev === id ? null : id));
-    setSelectedSizes((prev) => ({ ...prev, [id]: prev[id] ?? "50g" }));
-  }, []);
-
-  const handleSizeSelect = useCallback((id: number, size: Size) => {
-    setSelectedSizes((prev) => ({ ...prev, [id]: size }));
-  }, []);
-
-  const handleAddToBag = useCallback((flavourId: number) => {
-    const size = selectedSizes[flavourId] ?? "50g";
-    const flavour = FLAVOURS.find((f) => f.id === flavourId);
-    if (!flavour) return;
-    const price = calcPrice(flavour.price, size);
-
-    addToCart({
-      id: `shop-${flavourId}-${size}`,
-      type: "flavour",
-      name: `${flavour.name} (${size})`,
-      price,
-      quantity: 1,
-    });
-
+  const handleAdd = useCallback((id: number, sz: Size, price: number) => {
+    const f = FLAVOURS.find(x => x.id === id);
+    if (!f) return;
+    addToCart({ id: `shop-${id}-${sz}`, type: "flavour", name: `${f.name} (${sz})`, price, quantity: 1 });
     // Fly animation
-    const jarEl = sectionRef.current?.querySelector(`.jar-cell[data-flavour="${flavourId}"] .jar-breathe`) ?? null;
+    const jarEl = sectionRef.current?.querySelector(`.jar-cell[data-flavour="${id}"] .jar-breathe`);
     if (jarEl) {
-      const rect = jarEl.getBoundingClientRect();
+      const rect  = jarEl.getBoundingClientRect();
       const clone = jarEl.cloneNode(true) as HTMLElement;
       clone.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;width:${rect.width}px;height:${rect.height}px;z-index:9999;pointer-events:none;`;
       document.body.appendChild(clone);
-      gsap.to(clone, { x: window.innerWidth - rect.left - rect.width - 20, y: -(rect.top - 20), scale: 0.18, opacity: 0, duration: 0.75, ease: "power3.in", onComplete: () => clone.remove() });
+      gsap.to(clone, { x: window.innerWidth - rect.left - rect.width - 20, y: -(rect.top - 20), scale: 0.2, opacity: 0, duration: 0.75, ease: "power3.in", onComplete: () => clone.remove() });
     }
-
-    // Elastic bounce on jar
-    const jarContainer = sectionRef.current?.querySelector(`.jar-cell[data-flavour="${flavourId}"] .jar-breathe`);
-    if (jarContainer) {
-      gsap.fromTo(jarContainer, { scale: 1.15 }, { scale: 1, duration: 0.55, ease: "elastic.out(1,0.45)" });
-    }
-
-    setSelectedJar(null);
-  }, [selectedSizes, addToCart]);
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (!(e.target as Element).closest(".jar-cell")) setSelectedJar(null);
-    };
-    document.addEventListener("click", handleClick);
-    return () => document.removeEventListener("click", handleClick);
-  }, []);
+  }, [addToCart]);
 
   return (
     <section id="shop" ref={sectionRef} style={{
-      background: "var(--void)",
-      minHeight: "100vh",
-      position: "relative",
-      overflow: "hidden",
+      background: "var(--void)", minHeight: "100vh",
+      position: "relative", overflow: "hidden",
       display: "flex", flexDirection: "column",
     }}>
-      {/* ── Injected styles ── */}
       <style>{`
-        /* Bubble rise animation */
-        .jar-bubble {
-          animation: bubble-rise linear infinite;
-        }
-        @keyframes bubble-rise {
-          0%   { transform: translateY(0) scale(1); opacity: 0.8; }
-          70%  { transform: translateY(-55%) scale(1.15); opacity: 0.5; }
-          100% { transform: translateY(-90%) scale(0.5); opacity: 0; }
-        }
-
-        /* Liquid sloshing */
-        .jar-liquid {
-          animation: liquid-slosh 3.8s ease-in-out infinite;
-        }
-        @keyframes liquid-slosh {
-          0%,100% { transform: translateY(0) scaleX(1); }
-          30%     { transform: translateY(-2px) scaleX(1.01); }
-          60%     { transform: translateY(1px) scaleX(0.99); }
-        }
-
-        /* Jar hover tooltip */
+        /* Jar tooltip */
         .jar-tooltip {
-          display: none;
-          flex-direction: column; gap: 3px;
-          position: absolute;
-          bottom: calc(100% + 6px); left: 50%;
-          transform: translateX(-50%);
-          background: rgba(8,5,20,0.97);
-          border: 1px solid rgba(255,255,255,0.14);
-          border-radius: 10px;
-          padding: 10px 12px;
-          white-space: nowrap;
-          pointer-events: none;
-          z-index: 50;
-          box-shadow: 0 6px 24px rgba(0,0,0,0.65);
+          display:none; flex-direction:column; gap:3px;
+          position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
+          background:rgba(6,3,18,0.97); border:1px solid rgba(255,255,255,0.14);
+          border-radius:10px; padding:10px 14px; white-space:nowrap;
+          pointer-events:none; z-index:50;
+          box-shadow:0 8px 28px rgba(0,0,0,0.7);
         }
-        .jar-cell > div:hover .jar-tooltip { display: flex; }
+        .jar-cell > div:hover .jar-tooltip { display:flex; }
 
-        /* Smoke wisp on hover */
-        .jar-cell > div:hover .jar-wisp {
-          animation: wisp-rise 1.8s ease-out infinite;
-        }
-        .jar-wisp {
-          position: absolute; top: -16px; left: 50%;
-          transform: translateX(-50%);
-          width: 6px; height: 20px; border-radius: 50%;
-          background: rgba(200,180,255,0);
-          pointer-events: none; z-index: 10;
-        }
-        @keyframes wisp-rise {
-          0%   { background: rgba(220,200,255,0.5); transform: translateX(-50%) translateY(0) scale(1); opacity: 0.65; }
-          60%  { background: rgba(200,180,255,0.2); transform: translateX(-50%) translateY(-24px) scale(1.8); opacity: 0.3; }
-          100% { background: rgba(200,180,255,0);   transform: translateX(-50%) translateY(-40px) scale(2.5); opacity: 0; }
-        }
-
-        /* Selection pulse ring */
-        @keyframes ring-pulse {
-          0%,100% { opacity: 0.7; transform: scale(1); }
-          50%      { opacity: 0.2; transform: scale(1.05); }
-        }
+        /* Breathing */
+        .jar-breathe { display:block; }
 
         /* Counter beaker */
-        .counter-beaker {
-          width: 18px; height: 24px; position: relative;
-          border: 2px solid rgba(200,150,70,0.55);
-          border-top: none;
-          border-radius: 0 0 6px 6px;
-          background: rgba(200,150,50,0.12);
-          animation: beaker-glow 2.4s ease-in-out infinite;
-          flex-shrink: 0;
-        }
-        .counter-beaker::before {
-          content: '';
-          position: absolute; top: -7px; left: -4px; right: -4px; height: 7px;
-          border: 2px solid rgba(200,150,70,0.55); border-bottom: none; border-radius: 3px 3px 0 0;
-        }
-        .counter-beaker::after {
-          content: '';
-          position: absolute; bottom: 3px; left: 2px; right: 2px; height: 8px;
-          background: rgba(200,150,50,0.35); border-radius: 3px;
-          animation: beaker-fill 2.4s ease-in-out infinite;
-        }
-        @keyframes beaker-glow {
-          0%,100% { box-shadow: inset 0 0 6px rgba(200,150,50,0.15); }
-          50%      { box-shadow: inset 0 0 16px rgba(200,150,50,0.4); }
-        }
-        @keyframes beaker-fill {
-          0%,100% { opacity: 0.5; transform: scaleY(1); }
-          50%      { opacity: 1; transform: scaleY(1.18); }
-        }
-
-        /* Size panel entrance */
-        .jar-size-panel {
-          animation: panel-pop 0.24s cubic-bezier(0.16,1,0.3,1) both;
-        }
-        @keyframes panel-pop {
-          from { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.94); }
-          to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
-        }
+        .counter-beaker { width:18px; height:24px; position:relative; border:2px solid rgba(200,150,70,0.55); border-top:none; border-radius:0 0 6px 6px; background:rgba(200,150,50,0.1); flex-shrink:0; animation:beaker-glow 2.4s ease-in-out infinite; }
+        .counter-beaker::before { content:''; position:absolute; top:-7px; left:-4px; right:-4px; height:7px; border:2px solid rgba(200,150,70,0.55); border-bottom:none; border-radius:3px 3px 0 0; }
+        .counter-beaker::after  { content:''; position:absolute; bottom:3px; left:2px; right:2px; height:8px; background:rgba(200,150,50,0.35); border-radius:3px; animation:beaker-fill 2.4s ease-in-out infinite; }
+        @keyframes beaker-glow { 0%,100%{box-shadow:inset 0 0 6px rgba(200,150,50,0.15)} 50%{box-shadow:inset 0 0 16px rgba(200,150,50,0.4)} }
+        @keyframes beaker-fill { 0%,100%{opacity:.5;transform:scaleY(1)} 50%{opacity:1;transform:scaleY(1.18)} }
 
         /* Wall tile texture */
-        .dispensary-wall {
-          background:
-            repeating-linear-gradient(0deg,   rgba(255,255,255,0.014) 0px, rgba(255,255,255,0.014) 1px, transparent 1px, transparent 32px),
-            repeating-linear-gradient(90deg,  rgba(255,255,255,0.009) 0px, rgba(255,255,255,0.009) 1px, transparent 1px, transparent 32px);
-        }
-
-        /* Marketing tagline fade */
-        .marketing-tag { transition: opacity 0.6s ease; }
+        .dispensary-wall { background: repeating-linear-gradient(0deg,rgba(255,255,255,0.013) 0px,rgba(255,255,255,0.013) 1px,transparent 1px,transparent 32px), repeating-linear-gradient(90deg,rgba(255,255,255,0.008) 0px,rgba(255,255,255,0.008) 1px,transparent 1px,transparent 32px); }
 
         /* Filter scrollbar hide */
-        .shop-filter-bar::-webkit-scrollbar { display: none; }
+        .shop-filter-bar::-webkit-scrollbar { display:none; }
 
         /* Shelf entrance */
-        .shelf-row { opacity: 0; }
+        .shelf-row { opacity:0; }
       `}</style>
 
-      {/* Wall texture */}
       <div className="dispensary-wall" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0 }} />
+      <div style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", height: 400, background: "radial-gradient(ellipse 100% 80% at 50% 100%, rgba(140,80,10,0.1) 0%, transparent 70%)", pointerEvents: "none", zIndex: 0 }} />
 
-      {/* Amber warmth from below */}
-      <div style={{
-        position: "absolute", bottom: 0, left: "50%",
-        transform: "translateX(-50%)",
-        width: "100%", height: 400,
-        background: "radial-gradient(ellipse 100% 80% at 50% 100%, rgba(160,90,10,0.12) 0%, transparent 70%)",
-        pointerEvents: "none", zIndex: 0,
-      }} />
-
-      {/* Violet tint top-left */}
-      <div style={{
-        position: "absolute", top: "-5%", left: "-5%",
-        width: 500, height: 500, borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(124,58,237,0.06) 0%, transparent 70%)",
-        pointerEvents: "none", zIndex: 0,
-      }} />
-
-      {/* ── Main content ── */}
       <div style={{
         maxWidth: 1220, width: "100%", margin: "0 auto",
         padding: isMobile ? "clamp(40px,6vw,80px) 16px 0" : "clamp(60px,8vw,120px) 40px 0",
         position: "relative", zIndex: 1, flex: 1,
       }}>
-
-        {/* ── Header ── */}
+        {/* Header */}
         <div style={{ marginBottom: isMobile ? 28 : 40 }}>
           <span className="section-label" style={{ color: "rgba(200,150,70,0.85)" }}>
             <span style={{ width: 24, height: 1, background: "rgba(200,150,70,0.65)", display: "inline-block", marginRight: 8 }} />
-            Rare Compounds · Dispensary Est. 2024
+            The Lab · {FLAVOURS.length} Active Compounds
           </span>
-
           <h2 style={{
             fontFamily: "var(--font-bebas)",
-            fontSize: isMobile ? "clamp(48px,11vw,72px)" : "clamp(64px,7.5vw,108px)",
-            lineHeight: 0.88, letterSpacing: "0.04em",
-            color: "#f0f2fa", marginBottom: 10,
+            fontSize: isMobile ? "clamp(52px,12vw,80px)" : "clamp(68px,7.5vw,110px)",
+            lineHeight: 0.88, letterSpacing: "0.04em", color: "#f0f2fa", marginBottom: 10,
           }}>
-            THE<br />
-            <span style={{ color: "rgba(200,150,70,0.95)", textShadow: "0 0 60px rgba(200,150,50,0.4)" }}>
-              DISPENSARY
+            FLAVOUR<br />
+            <span style={{ color: "rgba(200,150,70,0.95)", textShadow: "0 0 60px rgba(200,150,50,0.35)" }}>
+              SHOP
             </span>
           </h2>
-
-          {/* Cycling marketing line */}
           <p style={{
-            fontFamily: "var(--font-serif)",
-            fontStyle: "italic",
-            fontSize: isMobile ? 14 : 18,
-            color: "rgba(220,190,120,0.7)",
+            fontFamily: "var(--font-serif)", fontStyle: "italic",
+            fontSize: isMobile ? 14 : 18, color: "rgba(220,190,120,0.65)",
             marginTop: 8, letterSpacing: "0.02em",
-          }}>
-            {MARKETING_LINES[marketingIdx]}
-          </p>
-
+            transition: "opacity 0.5s ease",
+          }}>{TAGLINES[taglineIdx]}</p>
           <p style={{
-            fontFamily: "var(--font-mono)", fontSize: isMobile ? 9 : 10,
-            letterSpacing: "0.22em", textTransform: "uppercase",
-            color: "rgba(200,150,70,0.5)", marginTop: 10,
-          }}>
-            {FLAVOURS.length} active compounds · Click a jar to open your prescription
-          </p>
+            fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.22em",
+            textTransform: "uppercase", color: "rgba(200,150,70,0.4)", marginTop: 10,
+          }}>Click any jar to open it · choose your size · add to bag</p>
         </div>
 
-        {/* ── Category filter ── */}
+        {/* Category filter */}
         <div
           className="shop-filter-bar"
-          style={{
-            display: "flex", gap: 6,
-            flexWrap: isMobile ? "nowrap" : "wrap",
-            overflowX: isMobile ? "auto" : "visible",
-            scrollbarWidth: "none",
-            paddingBottom: isMobile ? 8 : 0,
-            marginBottom: isMobile ? 28 : 40,
-          } as React.CSSProperties}
+          style={{ display: "flex", gap: 6, flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : "visible", scrollbarWidth: "none", paddingBottom: isMobile ? 8 : 0, marginBottom: isMobile ? 28 : 40 } as React.CSSProperties}
         >
-          {CATEGORIES.map((cat) => {
+          {CATEGORIES.map(cat => {
             const isActive = activeCategory === cat;
             return (
-              <button
-                key={cat}
-                onClick={() => { setActiveCategory(cat); setSelectedJar(null); }}
+              <button key={cat}
+                onClick={() => setActiveCategory(cat)}
                 style={{
-                  flex: "0 0 auto",
-                  fontFamily: "var(--font-mono)", fontSize: 9,
+                  flex: "0 0 auto", fontFamily: "var(--font-mono)", fontSize: 9,
                   letterSpacing: "0.14em", textTransform: "uppercase",
                   padding: isMobile ? "6px 12px" : "7px 16px",
                   minHeight: 34, whiteSpace: "nowrap", borderRadius: 20,
-                  border: isActive ? "1px solid rgba(200,150,70,0.75)" : "1px solid rgba(180,140,80,0.18)",
-                  background: isActive ? "rgba(180,120,40,0.22)" : "rgba(140,90,20,0.06)",
-                  color: isActive ? "rgba(230,180,90,0.95)" : "rgba(160,120,60,0.55)",
+                  border: isActive ? "1px solid rgba(200,150,70,0.75)" : "1px solid rgba(180,140,80,0.15)",
+                  background: isActive ? "rgba(180,120,40,0.2)" : "rgba(140,90,20,0.05)",
+                  color: isActive ? "rgba(230,180,90,0.95)" : "rgba(160,120,60,0.5)",
                   cursor: "pointer", transition: "all 0.2s ease",
-                  boxShadow: isActive ? "0 0 14px rgba(200,150,50,0.22), inset 0 1px 0 rgba(220,170,80,0.12)" : "none",
+                  boxShadow: isActive ? "0 0 14px rgba(200,150,50,0.2)" : "none",
                 }}
               >
-                {cat === "All" ? "ALL COMPOUNDS" : cat.toUpperCase()}
+                {cat === "All" ? "ALL" : cat.toUpperCase()}
               </button>
             );
           })}
         </div>
 
-        {/* ── Shelves ── */}
-        <div ref={shelvesAreaRef}>
+        {/* Shelves */}
+        <div ref={shelvesRef}>
           {shelves.map((shelfJars, rowIdx) => (
             <ShelfRow
               key={rowIdx}
               jars={shelfJars}
               rowIndex={rowIdx}
-              selectedJar={selectedJar}
-              selectedSizes={selectedSizes}
-              onJarClick={handleJarClick}
-              onSizeSelect={handleSizeSelect}
-              onAddToBag={handleAddToBag}
+              onOpen={setModalFlavour}
               isMobile={isMobile}
             />
           ))}
         </div>
       </div>
 
-      {/* ── Sticky counter bar ── */}
-      <CounterBar
-        cartCount={totalCount}
-        cartTotal={totalVal}
-        onViewBag={() => setCartOpen(true)}
-      />
+      <CounterBar count={totalCount} total={totalVal} onView={() => setCartOpen(true)} />
+
+      {/* Jar detail modal */}
+      {modalFlavour && (
+        <JarModal
+          flavour={modalFlavour}
+          onClose={() => setModalFlavour(null)}
+          onAdd={handleAdd}
+        />
+      )}
     </section>
   );
 }

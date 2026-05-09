@@ -5,7 +5,7 @@ import type { RentalModel } from "@/data/rentals";
 
 export interface CartItem {
   id: string;
-  type: "flavour" | "rental" | "session";
+  type: "flavour" | "rental" | "session" | "addon";
   name: string;
   price: number;
   quantity: number;
