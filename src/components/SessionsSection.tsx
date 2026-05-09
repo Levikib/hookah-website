@@ -971,18 +971,32 @@ function SessionCard({
     gsap.to(cardRef.current, { rotateY: 0, rotateX: 0, duration: 0.6, ease: "elastic.out(1,0.6)" });
   }, []);
 
-  const handleClick = useCallback(() => {
+  const pointerDownPos = useRef({ x: 0, y: 0 });
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    pointerDownPos.current = { x: e.clientX, y: e.clientY };
+  }, []);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    const dx = Math.abs(e.clientX - pointerDownPos.current.x);
+    const dy = Math.abs(e.clientY - pointerDownPos.current.y);
+    // Only treat as a tap if movement < 8px (not a scroll drag)
+    if (dx > 8 || dy > 8) return;
     if (!cardRef.current) { onSelect(session); return; }
     gsap.to(cardRef.current, {
       scale: 0.97, duration: 0.1,
-      onComplete: () => gsap.to(cardRef.current, { scale: 1, duration: 0.35, ease: "elastic.out(1.2,0.5)", onComplete: () => onSelect(session) }),
+      onComplete: () => gsap.to(cardRef.current, {
+        scale: 1, duration: 0.35, ease: "elastic.out(1.2,0.5)",
+        onComplete: () => onSelect(session),
+      }),
     });
   }, [onSelect, session]);
 
   return (
     <div
       ref={cardRef}
-      onClick={handleClick}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
       onMouseMove={handleMouseMove}
       data-session-card
       style={{
@@ -1192,6 +1206,8 @@ export default function SessionsSection() {
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (!trackRef.current) return;
+    // Only handle primary button (left click / touch)
+    if (e.button !== 0 && e.pointerType === "mouse") return;
     cancelMomentum();
     drag.current = {
       active: true,
@@ -1202,7 +1218,7 @@ export default function SessionsSection() {
       lastT: performance.now(),
     };
     trackRef.current.style.cursor = "grabbing";
-    trackRef.current.setPointerCapture(e.pointerId);
+    // Do NOT setPointerCapture — that swallows card click events
   }, [cancelMomentum]);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
