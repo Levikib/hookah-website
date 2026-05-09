@@ -42,6 +42,9 @@
   --gradient-nebula: linear-gradient(180deg, #05030a 0%, #0d0a1e 40%, #120d28 100%);
   --gradient-hero:   radial-gradient(ellipse 120% 80% at 60% 40%, #1a0a3e 0%, #05030a 70%);
 
+  /* ── Executive serif ── */
+  --font-serif: var(--font-cormorant), 'Georgia', serif;
+
   /* ── Z-index layers ── */
   --z-canvas:  0;
   --z-scrim:   10;
