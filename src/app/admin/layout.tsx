@@ -6,7 +6,7 @@ async function checkAuth() {
   const store = await cookies();
   const session = store.get("admin_session")?.value;
   if (!session || session !== process.env.ADMIN_SECRET) {
-    redirect("/admin/login");
+    redirect("/admin-login");
   }
 }
 
