@@ -672,14 +672,58 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
   const total = sessionPrice + flavourTotal + deliveryFee;
 
   const [promoInput, setPromoInput] = useState(promoCode);
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleApplyPromo = () => {
     setPromoCode(promoInput.trim());
   };
 
-  const handleConfirm = () => {
-    const ref = genRef();
-    onConfirm(ref);
+  const handleConfirm = async () => {
+    if (!customerName.trim() || !customerEmail.trim()) {
+      setError("Please enter your name and email.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/paystack/initialize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: customerEmail.trim(),
+          amount: total,
+          bookingData: {
+            name: customerName.trim(),
+            phone: customerPhone.trim() || undefined,
+            sessionId: session?.id ?? "unknown",
+            sessionName: session?.name ?? "Session",
+            bookingDate: date ?? "",
+            timeSlot: timeSlot ?? "",
+            flavours: selectedFlavours.map(f => ({ flavourId: f.id, quantity: 1 })),
+            notes: `Location: ${location}${location === "delivery" ? ` — ${deliveryAddress}` : ""}`,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Payment failed. Please try again.");
+        setLoading(false);
+        return;
+      }
+      // Redirect to Paystack checkout
+      window.location.href = data.authorization_url;
+    } catch {
+      setError("Network error. Please check your connection and try again.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -866,9 +910,61 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
             )}
           </div>
 
+          {/* Customer details */}
+          <div style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 12,
+            padding: "16px 18px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.2em", color: "var(--text-dim)", textTransform: "uppercase", marginBottom: 4 }}>
+              Your Details
+            </p>
+            {[
+              { placeholder: "Full name *", value: customerName, onChange: setCustomerName, type: "text" },
+              { placeholder: "Email address *", value: customerEmail, onChange: setCustomerEmail, type: "email" },
+              { placeholder: "Phone (optional)", value: customerPhone, onChange: setCustomerPhone, type: "tel" },
+            ].map(({ placeholder, value, onChange, type }) => (
+              <input
+                key={placeholder}
+                type={type}
+                placeholder={placeholder}
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                style={{
+                  width: "100%",
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: 8,
+                  padding: "11px 14px",
+                  fontFamily: "var(--font-barlow)",
+                  fontSize: 14,
+                  color: "var(--text-primary)",
+                  outline: "none",
+                  minHeight: 44,
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Error message */}
+          {error && (
+            <p style={{
+              fontFamily: "var(--font-barlow)", fontSize: 13,
+              color: "#ff6b6b", padding: "8px 14px",
+              background: "rgba(255,107,107,0.08)",
+              border: "1px solid rgba(255,107,107,0.25)",
+              borderRadius: 8,
+            }}>{error}</p>
+          )}
+
           {/* Confirm button */}
           <button
             onClick={handleConfirm}
+            disabled={loading || session?.isCustom}
             className="btn-teal"
             style={{
               width: "100%",
@@ -878,9 +974,10 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
               padding: "18px 0",
               borderRadius: 12,
               marginTop: 4,
+              opacity: loading ? 0.7 : 1,
             }}
           >
-            Confirm &amp; Pay
+            {loading ? "Redirecting to payment…" : session?.isCustom ? "We'll contact you to quote" : `Confirm & Pay ${kes(total)}`}
           </button>
         </div>
       </div>

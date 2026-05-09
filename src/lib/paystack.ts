@@ -116,6 +116,7 @@ export async function initializePayment(
         amount: params.amount_kobo,
         reference: params.reference,
         currency: "KES",
+        callback_url: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://hookah-website-two.vercel.app"}/booking/confirm`,
         ...(params.metadata ? { metadata: params.metadata } : {}),
       }),
     }
