@@ -1,558 +1,727 @@
 "use client";
-import React, { useEffect, useRef, useState, useCallback } from "react";
-import * as THREE from "three";
-import { CSS3DRenderer, CSS3DObject } from "three/examples/jsm/renderers/CSS3DRenderer.js";
+import React, {
+  useEffect, useRef, useState, useCallback, useMemo, memo, forwardRef,
+} from "react";
 import { gsap } from "gsap";
-import { FLAVOURS, CATEGORIES, getStockStatus } from "@/data/flavours";
+import { FLAVOURS, getStockStatus, type Flavour } from "@/data/flavours";
 import { useStore } from "@/store/useStore";
 import { useIsMobile } from "@/context/MobileContext";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 type Layout = "TABLE" | "SPHERE" | "HELIX" | "GRID";
 
-interface CardTarget {
-  x: number; y: number; z: number;
-  rotX: number; rotY: number; rotZ: number;
-}
+const CARD_W = 200;
+const CARD_H = 240;
+const COLS   = 6;  // 36 cards → 6×6 table
 
-// ─── Layout position calculators ─────────────────────────────────────────────
-const CARD_W = 160;
-const CARD_H = 200;
+const CATEGORY_COLORS: Record<string, string> = {
+  Classic:   "#e74c3c",
+  Fresh:     "#1abc9c",
+  Fruity:    "#ff6b9d",
+  Tropical:  "#f39c12",
+  Floral:    "#fd79a8",
+  Specialty: "#e17055",
+  Novelty:   "#a29bfe",
+  Mystery:   "#74b9ff",
+  Premium:   "#ffd700",
+};
 
-function tableTargets(): CardTarget[] {
-  // Periodic-table style: rows = category, cols = intensity
-  const categories = ["Classic", "Fresh", "Fruity", "Tropical", "Floral", "Specialty", "Novelty", "Premium", "Mystery"];
-  const intensities = ["Mild", "Medium", "Strong"];
-  return FLAVOURS.map((f) => {
-    const row = categories.indexOf(f.category);
-    const col = intensities.indexOf(f.intensity);
-    const safeRow = row < 0 ? 0 : row;
-    const safeCol = col < 0 ? 0 : col;
-    return {
-      x: (safeCol - 1) * (CARD_W + 16),
-      y: -(safeRow - 4) * (CARD_H + 12),
-      z: 0,
-      rotX: 0, rotY: 0, rotZ: 0,
-    };
-  });
-}
-
-function sphereTargets(): CardTarget[] {
-  return FLAVOURS.map((_, i) => {
-    const phi   = Math.acos(-1 + (2 * i) / FLAVOURS.length);
-    const theta = Math.sqrt(FLAVOURS.length * Math.PI) * phi;
-    const r = 700;
-    return {
-      x: r * Math.sin(phi) * Math.cos(theta),
-      y: r * Math.sin(phi) * Math.sin(theta),
-      z: r * Math.cos(phi),
-      rotX: -phi * (180 / Math.PI) + 90,
-      rotY:  theta * (180 / Math.PI),
-      rotZ: 0,
-    };
-  });
-}
-
-function helixTargets(): CardTarget[] {
-  return FLAVOURS.map((_, i) => {
-    const t = i / FLAVOURS.length;
-    const angle = t * Math.PI * 6;
-    const strand = i % 2 === 0 ? 1 : -1;
-    const r = 320;
-    return {
-      x: Math.sin(angle) * r * strand,
-      y: (t - 0.5) * -1200,
-      z: Math.cos(angle) * r * strand,
-      rotX: 0,
-      rotY: -angle * (180 / Math.PI),
-      rotZ: 0,
-    };
-  });
-}
-
-function gridTargets(): CardTarget[] {
-  const cols = 5;
-  return FLAVOURS.map((_, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    return {
-      x: (col - (cols - 1) / 2) * (CARD_W + 20),
-      y: -(row - 2) * (CARD_H + 20),
-      z: 0,
-      rotX: 0, rotY: 0, rotZ: 0,
-    };
-  });
-}
-
-function getTargets(layout: Layout): CardTarget[] {
-  switch (layout) {
-    case "TABLE":  return tableTargets();
-    case "SPHERE": return sphereTargets();
-    case "HELIX":  return helixTargets();
-    case "GRID":   return gridTargets();
-  }
-}
-
-// ─── Intensity / category colours ────────────────────────────────────────────
 const INTENSITY_COLORS: Record<string, string> = {
   Mild:   "#22d3ee",
   Medium: "#f59e0b",
   Strong: "#ff6b35",
 };
-const CATEGORY_COLORS: Record<string, string> = {
-  Classic:   "#e74c3c",  Fresh:    "#1abc9c",  Fruity:  "#ff6b9d",
-  Tropical:  "#f39c12",  Floral:   "#fd79a8",  Specialty: "#e17055",
-  Novelty:   "#6c5ce7",  Premium:  "#5f27cd",  Mystery: "#74b9ff",
+
+const LAYOUT_META: Record<Layout, { label: string; hint: string }> = {
+  TABLE:  { label: "Table View",    hint: "Browse by category & intensity" },
+  SPHERE: { label: "Sphere View",   hint: "Drag to rotate the flavour globe" },
+  HELIX:  { label: "Helix View",    hint: "Drag to spin the DNA spiral" },
+  GRID:   { label: "Grid View",     hint: "Clean collection overview" },
 };
 
-// ─── Single flavour card DOM builder ─────────────────────────────────────────
-function buildCardEl(
-  f: typeof FLAVOURS[0],
-  onAdd: (id: string, name: string, price: number) => void
-): HTMLDivElement {
-  const accent = CATEGORY_COLORS[f.category] ?? "#22d3ee";
-  const intColor = INTENSITY_COLORS[f.intensity] ?? "#fff";
-  const stock = getStockStatus(f.stock);
-  const isOut = stock === "out";
+// ─── Layout position calculators ─────────────────────────────────────────────
+interface Pos { x: number; y: number; z: number; rx: number; ry: number; rz: number; }
 
-  const el = document.createElement("div");
-  el.className = "fw-card";
-  el.dataset.id = String(f.id);
-  el.style.cssText = `
-    width:${CARD_W}px; height:${CARD_H}px;
-    background: rgba(10,6,20,0.92);
-    border: 1px solid ${accent}44;
-    border-top: 2px solid ${accent};
-    border-radius: 14px;
-    padding: 14px 12px 12px;
-    display: flex; flex-direction: column; gap: 6px;
-    cursor: pointer;
-    box-shadow: 0 0 24px ${accent}22, inset 0 1px 0 rgba(255,255,255,0.06);
-    backdrop-filter: blur(12px);
-    transition: box-shadow 0.25s ease, border-color 0.25s ease;
-    font-family: system-ui, sans-serif;
-    user-select: none;
-    opacity: ${isOut ? 0.45 : 1};
-  `;
-
-  // Glow orb
-  const orb = document.createElement("div");
-  orb.style.cssText = `
-    position: absolute; width: 60px; height: 60px;
-    border-radius: 50%;
-    background: radial-gradient(circle, ${accent}33 0%, transparent 70%);
-    top: -10px; right: -10px; pointer-events: none;
-  `;
-  el.style.position = "relative";
-  el.appendChild(orb);
-
-  // Emoji
-  const emoji = document.createElement("div");
-  emoji.textContent = f.emoji;
-  emoji.style.cssText = `font-size: 28px; line-height: 1; margin-bottom: 2px;`;
-  el.appendChild(emoji);
-
-  // Name
-  const name = document.createElement("div");
-  name.textContent = f.name;
-  name.style.cssText = `
-    font-family: var(--font-bebas, 'Bebas Neue', system-ui);
-    font-size: 17px; letter-spacing: 0.05em; text-transform: uppercase;
-    color: #fff; line-height: 1; margin-bottom: 2px;
-  `;
-  el.appendChild(name);
-
-  // Category + intensity row
-  const meta = document.createElement("div");
-  meta.style.cssText = `display: flex; gap: 6px; align-items: center; flex-wrap: wrap;`;
-  const catEl = document.createElement("span");
-  catEl.textContent = f.category;
-  catEl.style.cssText = `font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.45);`;
-  const intEl = document.createElement("span");
-  intEl.textContent = `· ${f.intensity}`;
-  intEl.style.cssText = `font-size: 9px; color: ${intColor}; letter-spacing: 0.08em;`;
-  meta.appendChild(catEl);
-  meta.appendChild(intEl);
-  el.appendChild(meta);
-
-  // Notes
-  const notes = document.createElement("div");
-  notes.style.cssText = `display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px;`;
-  f.notes.slice(0, 2).forEach((n) => {
-    const tag = document.createElement("span");
-    tag.textContent = n;
-    tag.style.cssText = `font-size: 9px; padding: 2px 6px; border-radius: 20px; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.55); letter-spacing: 0.06em;`;
-    notes.appendChild(tag);
+function tablePos(): Pos[] {
+  // 6 columns = intensities × categories spread
+  // Row = group of 6 per row, column by intensity cycling
+  const CATS = ["Classic","Fresh","Fruity","Tropical","Floral","Specialty","Novelty","Mystery","Premium"] as const;
+  return FLAVOURS.map((f) => {
+    const catIdx = CATS.indexOf(f.category as typeof CATS[number]);
+    const inRow  = catIdx < 0 ? 0 : catIdx;
+    const colMap: Record<string, number> = { Mild: 0, Medium: 1, Strong: 2 };
+    const baseCol = (colMap[f.intensity] ?? 0) * 2;
+    // Within same cat+intensity, offset by sub-index
+    const sameGroup = FLAVOURS.filter(x => x.category === f.category && x.intensity === f.intensity);
+    const subIdx = sameGroup.findIndex(x => x.id === f.id);
+    const col = baseCol + (subIdx % 2);
+    const padX = (COLS - 1) * (CARD_W + 24) / 2;
+    return {
+      x: col * (CARD_W + 24) - padX,
+      y: -inRow * (CARD_H + 20) + (4 * (CARD_H + 20) / 2),
+      z: 0, rx: 0, ry: 0, rz: 0,
+    };
   });
-  el.appendChild(notes);
-
-  // Spacer
-  const spacer = document.createElement("div");
-  spacer.style.cssText = `flex: 1;`;
-  el.appendChild(spacer);
-
-  // Stock badge
-  if (stock !== "normal") {
-    const badge = document.createElement("div");
-    badge.textContent = stock === "out" ? "SOLD OUT" : stock === "critical" ? "ALMOST GONE" : "LOW STOCK";
-    badge.style.cssText = `font-size: 8px; letter-spacing: 0.14em; padding: 2px 6px; border-radius: 4px; border: 1px solid ${stock === "out" ? "rgba(255,255,255,0.15)" : "#f59e0b"}; color: ${stock === "out" ? "rgba(255,255,255,0.3)" : "#f59e0b"}; display: inline-block; margin-bottom: 4px;`;
-    el.appendChild(badge);
-  }
-
-  // Price + button row
-  const bottom = document.createElement("div");
-  bottom.style.cssText = `display: flex; justify-content: space-between; align-items: center;`;
-
-  const price = document.createElement("span");
-  price.textContent = `$${f.price.toFixed(2)}`;
-  price.style.cssText = `font-family: var(--font-mono, monospace); font-size: 15px; color: ${accent}; font-weight: 700;`;
-
-  const btn = document.createElement("button");
-  btn.textContent = isOut ? "Sold Out" : "+ Add";
-  btn.disabled = isOut;
-  btn.style.cssText = `
-    font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
-    padding: 6px 10px; border-radius: 8px; border: 1px solid ${isOut ? "rgba(255,255,255,0.1)" : accent};
-    background: ${isOut ? "transparent" : `${accent}22`}; color: ${isOut ? "rgba(255,255,255,0.3)" : accent};
-    cursor: ${isOut ? "not-allowed" : "pointer"}; transition: all 0.2s; font-family: inherit;
-  `;
-  btn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    if (isOut) return;
-    btn.textContent = "✓ Added";
-    btn.style.background = accent;
-    btn.style.color = "#000";
-    setTimeout(() => {
-      btn.textContent = "+ Add";
-      btn.style.background = `${accent}22`;
-      btn.style.color = accent;
-    }, 900);
-    onAdd(`flavour-${f.id}`, f.name, f.price);
-  });
-
-  bottom.appendChild(price);
-  bottom.appendChild(btn);
-  el.appendChild(bottom);
-
-  // Hover glow
-  el.addEventListener("mouseenter", () => {
-    el.style.boxShadow = `0 0 40px ${accent}55, 0 0 80px ${accent}22, inset 0 1px 0 rgba(255,255,255,0.1)`;
-    el.style.borderColor = `${accent}88`;
-    el.style.borderTopColor = accent;
-  });
-  el.addEventListener("mouseleave", () => {
-    el.style.boxShadow = `0 0 24px ${accent}22, inset 0 1px 0 rgba(255,255,255,0.06)`;
-    el.style.borderColor = `${accent}44`;
-    el.style.borderTopColor = accent;
-  });
-
-  return el;
 }
 
-// ─── Walking cursor SVG ───────────────────────────────────────────────────────
-const WALK_FRAMES = [
-  // Frame 0 — standing
-  `<svg viewBox="0 0 24 48" width="24" height="48" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="12" cy="6" r="4" fill="#22d3ee"/>
-    <rect x="9" y="11" width="6" height="14" rx="3" fill="#22d3ee"/>
-    <rect x="9" y="24" width="3" height="12" rx="1.5" fill="#22d3ee"/>
-    <rect x="12" y="24" width="3" height="12" rx="1.5" fill="#22d3ee"/>
-    <rect x="4" y="13" width="3" height="10" rx="1.5" fill="#22d3ee"/>
-    <rect x="17" y="13" width="3" height="10" rx="1.5" fill="#22d3ee"/>
-  </svg>`,
-  // Frame 1 — mid-stride
-  `<svg viewBox="0 0 24 48" width="24" height="48" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="12" cy="6" r="4" fill="#22d3ee"/>
-    <rect x="9" y="11" width="6" height="14" rx="3" fill="#22d3ee"/>
-    <rect x="7" y="24" width="3" height="13" rx="1.5" fill="#22d3ee" transform="rotate(12 8.5 24)"/>
-    <rect x="13" y="24" width="3" height="13" rx="1.5" fill="#22d3ee" transform="rotate(-12 14.5 24)"/>
-    <rect x="3" y="12" width="3" height="11" rx="1.5" fill="#22d3ee" transform="rotate(-15 4.5 12)"/>
-    <rect x="18" y="12" width="3" height="11" rx="1.5" fill="#22d3ee" transform="rotate(15 19.5 12)"/>
-  </svg>`,
-  // Frame 2 — full stride
-  `<svg viewBox="0 0 24 48" width="24" height="48" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="12" cy="6" r="4" fill="#22d3ee"/>
-    <rect x="9" y="11" width="6" height="14" rx="3" fill="#22d3ee"/>
-    <rect x="5" y="23" width="3" height="14" rx="1.5" fill="#22d3ee" transform="rotate(20 6.5 23)"/>
-    <rect x="15" y="23" width="3" height="14" rx="1.5" fill="#22d3ee" transform="rotate(-20 16.5 23)"/>
-    <rect x="2" y="11" width="3" height="11" rx="1.5" fill="#22d3ee" transform="rotate(-22 3.5 11)"/>
-    <rect x="19" y="11" width="3" height="11" rx="1.5" fill="#22d3ee" transform="rotate(22 20.5 11)"/>
-  </svg>`,
-];
+function spherePos(): Pos[] {
+  const N = FLAVOURS.length;
+  const R = Math.max(420, CARD_W * 1.8);
+  return FLAVOURS.map((_, i) => {
+    const phi   = Math.acos(1 - (2 * (i + 0.5)) / N);
+    const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+    const x = R * Math.sin(phi) * Math.cos(theta);
+    const y = R * Math.sin(phi) * Math.sin(theta);
+    const z = R * Math.cos(phi);
+    // Face outward
+    const ry = Math.atan2(x, z) * (180 / Math.PI);
+    const rx = -Math.atan2(y, Math.sqrt(x*x+z*z)) * (180 / Math.PI);
+    return { x, y, z, rx, ry, rz: 0 };
+  });
+}
 
-// ─── Layout icon SVGs ─────────────────────────────────────────────────────────
-const LAYOUT_ICONS: Record<Layout, string> = {
-  TABLE:  `<svg viewBox="0 0 20 20" fill="currentColor"><rect x="2" y="2" width="7" height="7" rx="1"/><rect x="11" y="2" width="7" height="7" rx="1"/><rect x="2" y="11" width="7" height="7" rx="1"/><rect x="11" y="11" width="7" height="7" rx="1"/></svg>`,
-  SPHERE: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="8"/><ellipse cx="10" cy="10" rx="4" ry="8"/><line x1="2" y1="10" x2="18" y2="10"/></svg>`,
-  HELIX:  `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2 Q16 6 4 10 Q16 14 4 18"/><path d="M16 2 Q4 6 16 10 Q4 14 16 18"/></svg>`,
-  GRID:   `<svg viewBox="0 0 20 20" fill="currentColor"><rect x="2" y="2" width="4" height="4" rx="0.5"/><rect x="8" y="2" width="4" height="4" rx="0.5"/><rect x="14" y="2" width="4" height="4" rx="0.5"/><rect x="2" y="8" width="4" height="4" rx="0.5"/><rect x="8" y="8" width="4" height="4" rx="0.5"/><rect x="14" y="8" width="4" height="4" rx="0.5"/><rect x="2" y="14" width="4" height="4" rx="0.5"/><rect x="8" y="14" width="4" height="4" rx="0.5"/><rect x="14" y="14" width="4" height="4" rx="0.5"/></svg>`,
-};
+function helixPos(): Pos[] {
+  const N = FLAVOURS.length;
+  const R = 280;
+  const H = (N / 2) * 90;
+  return FLAVOURS.map((_, i) => {
+    const strand = i % 2 === 0 ? 1 : -1;
+    const t = i / (N - 1);
+    const angle = t * Math.PI * 5 * strand;
+    const x = Math.cos(angle) * R;
+    const z = Math.sin(angle) * R;
+    const y = (t - 0.5) * -H;
+    const ry = -angle * (180 / Math.PI);
+    return { x, y, z, rx: 0, ry, rz: 0 };
+  });
+}
 
-const LAYOUTS: Layout[] = ["TABLE", "SPHERE", "HELIX", "GRID"];
+function gridPos(): Pos[] {
+  const cols = isMobileGlobal() ? 2 : 4;
+  const padX = (cols - 1) * (CARD_W + 28) / 2;
+  const rows  = Math.ceil(FLAVOURS.length / cols);
+  return FLAVOURS.map((_, i) => ({
+    x: (i % cols) * (CARD_W + 28) - padX,
+    y: -(Math.floor(i / cols) - (rows - 1) / 2) * (CARD_H + 28),
+    z: 0, rx: 0, ry: 0, rz: 0,
+  }));
+}
 
-// ─── Main component ───────────────────────────────────────────────────────────
+function isMobileGlobal() {
+  if (typeof window === "undefined") return false;
+  return window.innerWidth < 768;
+}
+
+function getPositions(layout: Layout): Pos[] {
+  switch (layout) {
+    case "TABLE":  return tablePos();
+    case "SPHERE": return spherePos();
+    case "HELIX":  return helixPos();
+    case "GRID":   return gridPos();
+  }
+}
+
+// ─── Flavour Detail Modal ─────────────────────────────────────────────────────
+const FlavourModal = memo(function FlavourModal({
+  flavour,
+  onClose,
+  onAdd,
+}: {
+  flavour: Flavour;
+  onClose: () => void;
+  onAdd: (f: Flavour) => void;
+}) {
+  const accent = CATEGORY_COLORS[flavour.category] ?? "#22d3ee";
+  const intColor = INTENSITY_COLORS[flavour.intensity] ?? "#22d3ee";
+  const stock = getStockStatus(flavour.stock);
+  const isOut = stock === "out";
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const panelRef   = useRef<HTMLDivElement>(null);
+  const [added, setAdded] = useState(false);
+
+  useEffect(() => {
+    gsap.fromTo(overlayRef.current,
+      { opacity: 0 },
+      { opacity: 1, duration: 0.3, ease: "power2.out" }
+    );
+    gsap.fromTo(panelRef.current,
+      { y: 60, opacity: 0, scale: 0.96 },
+      { y: 0,  opacity: 1, scale: 1,    duration: 0.45, ease: "back.out(1.5)" }
+    );
+  }, []);
+
+  const close = useCallback(() => {
+    gsap.to(overlayRef.current, { opacity: 0, duration: 0.2 });
+    gsap.to(panelRef.current, { y: 40, opacity: 0, scale: 0.96, duration: 0.2,
+      onComplete: onClose });
+  }, [onClose]);
+
+  const handleAdd = () => {
+    if (isOut) return;
+    setAdded(true);
+    onAdd(flavour);
+    setTimeout(() => setAdded(false), 1200);
+  };
+
+  return (
+    <div
+      ref={overlayRef}
+      onClick={(e) => e.target === overlayRef.current && close()}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1000,
+        background: "rgba(5,3,10,0.88)",
+        backdropFilter: "blur(12px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "20px",
+      }}
+    >
+      <div
+        ref={panelRef}
+        style={{
+          width: "min(640px, 94vw)",
+          background: "linear-gradient(145deg, #0d0a1e, #120d28)",
+          border: `1px solid ${accent}55`,
+          borderTop: `3px solid ${accent}`,
+          borderRadius: 20,
+          overflow: "hidden",
+          position: "relative",
+          boxShadow: `0 0 80px ${accent}22, 0 40px 80px rgba(0,0,0,0.8)`,
+        }}
+      >
+        {/* Glow bg */}
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none",
+          background: `radial-gradient(ellipse 70% 40% at 70% 0%, ${accent}18 0%, transparent 70%)`,
+        }} />
+
+        {/* Close */}
+        <button
+          onClick={close}
+          style={{
+            position: "absolute", top: 18, right: 18, zIndex: 10,
+            width: 36, height: 36, borderRadius: "50%",
+            border: "1px solid rgba(255,255,255,0.15)",
+            background: "rgba(255,255,255,0.06)",
+            color: "rgba(255,255,255,0.7)", fontSize: 18,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.2s",
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
+          onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+        >
+          ×
+        </button>
+
+        {/* Hero visual */}
+        <div style={{
+          height: 180,
+          background: `linear-gradient(135deg, ${accent}18 0%, transparent 60%), var(--nebula)`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          position: "relative", overflow: "hidden",
+        }}>
+          {/* Decorative rings */}
+          {[200, 140, 80].map((size, ri) => (
+            <div key={ri} style={{
+              position: "absolute",
+              width: size, height: size,
+              borderRadius: "50%",
+              border: `1px solid ${accent}${ri === 0 ? "18" : ri === 1 ? "28" : "45"}`,
+              animation: `spin-slow ${8 + ri * 4}s linear infinite ${ri % 2 ? "reverse" : ""}`,
+            }} />
+          ))}
+          <span style={{ fontSize: 72, position: "relative", zIndex: 1, filter: `drop-shadow(0 0 20px ${accent}88)` }}>
+            {flavour.emoji}
+          </span>
+        </div>
+
+        {/* Content */}
+        <div style={{ padding: "28px 32px 32px" }}>
+          {/* Tags row */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+            <span style={{
+              fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.16em",
+              textTransform: "uppercase", padding: "3px 10px", borderRadius: 4,
+              border: `1px solid ${accent}`, color: accent,
+              background: `${accent}15`,
+            }}>
+              {flavour.category}
+            </span>
+            <span style={{
+              fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.16em",
+              textTransform: "uppercase", padding: "3px 10px", borderRadius: 4,
+              border: `1px solid ${intColor}55`, color: intColor,
+            }}>
+              {flavour.intensity}
+            </span>
+            {stock !== "normal" && (
+              <span style={{
+                fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.16em",
+                textTransform: "uppercase", padding: "3px 10px", borderRadius: 4,
+                border: `1px solid ${stock === "out" ? "rgba(255,255,255,0.15)" : "#f59e0b"}`,
+                color: stock === "out" ? "rgba(255,255,255,0.3)" : "#f59e0b",
+              }}>
+                {stock === "out" ? "Sold Out" : stock === "critical" ? "Almost Gone" : "Low Stock"}
+              </span>
+            )}
+          </div>
+
+          {/* Name */}
+          <h2 style={{
+            fontFamily: "var(--font-bebas)", fontSize: "clamp(32px,5vw,48px)",
+            letterSpacing: "0.04em", textTransform: "uppercase",
+            color: "#fff", lineHeight: 1, marginBottom: 14,
+          }}>
+            {flavour.name}
+          </h2>
+
+          {/* Description */}
+          <p style={{
+            fontFamily: "var(--font-barlow)", fontSize: 15, lineHeight: 1.65,
+            color: "rgba(255,255,255,0.7)", marginBottom: 20,
+          }}>
+            {flavour.description}
+          </p>
+
+          {/* Notes */}
+          <div style={{ marginBottom: 20 }}>
+            <p style={{
+              fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.2em",
+              textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginBottom: 8,
+            }}>
+              Flavour Notes
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {flavour.notes.map((n) => (
+                <span key={n} style={{
+                  fontFamily: "var(--font-barlow)", fontWeight: 600, fontSize: 12,
+                  padding: "5px 14px", borderRadius: 24,
+                  background: `${accent}18`, border: `1px solid ${accent}33`,
+                  color: "rgba(255,255,255,0.8)",
+                }}>
+                  {n}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Pairs with */}
+          {flavour.pairsWith.length > 0 && (
+            <div style={{ marginBottom: 28 }}>
+              <p style={{
+                fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.2em",
+                textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginBottom: 8,
+              }}>
+                Pairs Well With
+              </p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {flavour.pairsWith.map((p) => (
+                  <span key={p} style={{
+                    fontFamily: "var(--font-barlow)", fontSize: 11,
+                    padding: "4px 10px", borderRadius: 20,
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    color: "rgba(255,255,255,0.5)",
+                  }}>
+                    + {p}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Price + CTA */}
+          <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+            <div>
+              <p style={{
+                fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.2em",
+                textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginBottom: 2,
+              }}>
+                Price
+              </p>
+              <p style={{
+                fontFamily: "var(--font-mono)", fontSize: 28, fontWeight: 700,
+                color: accent, lineHeight: 1,
+              }}>
+                ${flavour.price.toFixed(2)}
+              </p>
+            </div>
+            <div style={{ flex: 1, display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button
+                onClick={close}
+                style={{
+                  fontFamily: "var(--font-barlow)", fontWeight: 700, fontSize: 12,
+                  letterSpacing: "0.12em", textTransform: "uppercase",
+                  padding: "12px 24px", borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  background: "transparent", color: "rgba(255,255,255,0.5)",
+                  cursor: "pointer",
+                }}
+              >
+                Back
+              </button>
+              <button
+                onClick={handleAdd}
+                disabled={isOut}
+                style={{
+                  fontFamily: "var(--font-barlow)", fontWeight: 700, fontSize: 12,
+                  letterSpacing: "0.12em", textTransform: "uppercase",
+                  padding: "12px 28px", borderRadius: 10,
+                  border: `1px solid ${accent}`,
+                  background: added ? accent : `${accent}22`,
+                  color: added ? "#000" : accent,
+                  cursor: isOut ? "not-allowed" : "pointer",
+                  transition: "all 0.25s ease",
+                  opacity: isOut ? 0.4 : 1,
+                  minWidth: 140,
+                }}
+              >
+                {isOut ? "Sold Out" : added ? "✓ Added to Cart" : "Add to Session →"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// ─── Individual card ──────────────────────────────────────────────────────────
+interface CardProps { flavour: Flavour; onClick: () => void; visible: boolean; }
+
+const FlavourCard = forwardRef<HTMLDivElement, CardProps>(
+function FlavourCard({ flavour, onClick, visible }, ref) {
+  const accent   = CATEGORY_COLORS[flavour.category] ?? "#22d3ee";
+  const intColor = INTENSITY_COLORS[flavour.intensity];
+  const stock    = getStockStatus(flavour.stock);
+
+  return (
+    <div
+      data-flavour-id={flavour.id}
+      ref={ref}
+      onClick={onClick}
+      style={{
+        width: CARD_W,
+        height: CARD_H,
+        position: "absolute",
+        willChange: "transform",
+        transformStyle: "preserve-3d",
+        cursor: "pointer",
+        opacity: visible ? 1 : 0,
+        pointerEvents: visible ? "auto" : "none",
+        transition: "opacity 0.3s ease",
+      }}
+    >
+      <div
+        style={{
+          width: "100%", height: "100%",
+          background: "rgba(8,5,18,0.95)",
+          border: `1px solid ${accent}33`,
+          borderTop: `2px solid ${accent}`,
+          borderRadius: 16,
+          padding: "16px 14px 14px",
+          display: "flex", flexDirection: "column", gap: 8,
+          boxShadow: `0 0 20px ${accent}15, inset 0 1px 0 rgba(255,255,255,0.05)`,
+          backdropFilter: "blur(12px)",
+          transition: "box-shadow 0.25s ease, border-color 0.25s ease",
+          position: "relative", overflow: "hidden",
+          opacity: stock === "out" ? 0.45 : 1,
+        }}
+        onMouseEnter={e => {
+          const el = e.currentTarget as HTMLDivElement;
+          el.style.boxShadow = `0 0 40px ${accent}44, 0 12px 40px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.08)`;
+          el.style.borderColor = `${accent}77`;
+          el.style.borderTopColor = accent;
+        }}
+        onMouseLeave={e => {
+          const el = e.currentTarget as HTMLDivElement;
+          el.style.boxShadow = `0 0 20px ${accent}15, inset 0 1px 0 rgba(255,255,255,0.05)`;
+          el.style.borderColor = `${accent}33`;
+          el.style.borderTopColor = accent;
+        }}
+      >
+        {/* Corner glow */}
+        <div style={{
+          position: "absolute", top: -20, right: -20,
+          width: 80, height: 80, borderRadius: "50%",
+          background: `radial-gradient(circle, ${accent}22 0%, transparent 70%)`,
+          pointerEvents: "none",
+        }} />
+
+        {/* Emoji + stock */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <span style={{ fontSize: 32, lineHeight: 1 }}>{flavour.emoji}</span>
+          {stock !== "normal" && (
+            <span style={{
+              fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.12em",
+              textTransform: "uppercase", padding: "2px 6px", borderRadius: 4,
+              border: `1px solid ${stock === "out" ? "rgba(255,255,255,0.15)" : "#f59e0b"}`,
+              color: stock === "out" ? "rgba(255,255,255,0.3)" : "#f59e0b",
+            }}>
+              {stock === "out" ? "OUT" : stock === "critical" ? "LAST FEW" : "LOW"}
+            </span>
+          )}
+        </div>
+
+        {/* Name */}
+        <p style={{
+          fontFamily: "var(--font-bebas)", fontSize: 20,
+          letterSpacing: "0.05em", textTransform: "uppercase",
+          color: "#fff", lineHeight: 1, margin: 0,
+        }}>
+          {flavour.name}
+        </p>
+
+        {/* Category + intensity */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{
+            fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.1em",
+            textTransform: "uppercase", color: accent,
+          }}>
+            {flavour.category}
+          </span>
+          <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>·</span>
+          <span style={{
+            fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.08em",
+            color: intColor,
+          }}>
+            {flavour.intensity}
+          </span>
+        </div>
+
+        {/* Notes */}
+        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+          {flavour.notes.slice(0, 3).map((n) => (
+            <span key={n} style={{
+              fontFamily: "var(--font-barlow)", fontSize: 10,
+              padding: "2px 8px", borderRadius: 20,
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: "rgba(255,255,255,0.55)",
+            }}>
+              {n}
+            </span>
+          ))}
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        {/* Price + tap hint */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{
+            fontFamily: "var(--font-mono)", fontSize: 18,
+            fontWeight: 700, color: accent,
+          }}>
+            ${flavour.price.toFixed(2)}
+          </span>
+          <span style={{
+            fontFamily: "var(--font-mono)", fontSize: 9,
+            letterSpacing: "0.1em", textTransform: "uppercase",
+            color: "rgba(255,255,255,0.25)",
+          }}>
+            View →
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// ─── Main FlavourWall ─────────────────────────────────────────────────────────
 export default function FlavourWall() {
-  const containerRef  = useRef<HTMLDivElement>(null);
-  const rendererRef   = useRef<CSS3DRenderer | null>(null);
-  const sceneRef      = useRef<THREE.Scene | null>(null);
-  const cameraRef     = useRef<THREE.PerspectiveCamera | null>(null);
-  const objectsRef    = useRef<CSS3DObject[]>([]);
-  const rafRef        = useRef<number>(0);
-  const isDraggingRef = useRef(false);
-  const mouseDownRef  = useRef({ x: 0, y: 0 });
-  const rotationRef   = useRef({ x: 0, y: 0 });
-  const targetRotRef  = useRef({ x: 0, y: 0 });
-  const velocityRef   = useRef({ x: 0, y: 0 });
-  const cursorRef     = useRef<HTMLDivElement>(null);
-  const frameRef      = useRef(0);
-  const frameTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastMouseRef  = useRef({ x: -999, y: -999 });
-  const movingRef     = useRef(false);
-  const movingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flipRef       = useRef(false);
-  const transitioningRef = useRef(false);
-
-  const [layout, setLayout]       = useState<Layout>("TABLE");
-  const [activeLayout, setActiveLayout] = useState<Layout>("TABLE");
-  const [categoryFilter, setCategoryFilter] = useState("All");
   const isMobile = useIsMobile();
   const addToCart = useStore((s) => s.addToCart);
 
-  const handleAdd = useCallback((id: string, name: string, price: number) => {
-    addToCart({ id, type: "flavour", name, price, quantity: 1 });
-  }, [addToCart]);
+  const [layout, setLayout]         = useState<Layout>("GRID");
+  const [targetLayout, setTarget]   = useState<Layout>("GRID");
+  const [category, setCategory]     = useState("All");
+  const [selectedFlavour, setSelected] = useState<Flavour | null>(null);
+  const [morphing, setMorphing]     = useState(false);
 
-  // ── Init Three + CSS3DRenderer ──────────────────────────────────────────────
+  const sceneRef   = useRef<HTMLDivElement>(null);
+  const wrapRef    = useRef<HTMLDivElement>(null);
+  const cardRefs   = useRef<(HTMLDivElement | null)[]>([]);
+  const positions  = useRef<Pos[]>([]);
+
+  // Camera state (for all-axis orbit via drag)
+  const orbitRef       = useRef({ x: 0, y: 0 });
+  const targetOrbitRef = useRef({ x: 0, y: 0 });
+  const velRef         = useRef({ x: 0, y: 0 });
+  const isDragging     = useRef(false);
+  const lastPointer    = useRef({ x: 0, y: 0 });
+  const rafOrbit       = useRef<number>(0);
+
+  // Init card refs array
   useEffect(() => {
-    if (!containerRef.current) return;
-    const W = containerRef.current.clientWidth;
-    const H = containerRef.current.clientHeight;
+    cardRefs.current = cardRefs.current.slice(0, FLAVOURS.length);
+  }, []);
 
-    const scene  = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(50, W / H, 1, 10000);
-    camera.position.z = 1800;
+  // ── Apply positions to DOM cards ──────────────────────────────────────────
+  const applyPositions = useCallback((plist: Pos[], animate: boolean, onDone?: () => void) => {
+    const els = cardRefs.current;
+    if (!els.length) return;
 
-    const renderer = new CSS3DRenderer();
-    renderer.setSize(W, H);
-    renderer.domElement.style.cssText = `position:absolute; inset:0; overflow:hidden;`;
-    containerRef.current.appendChild(renderer.domElement);
+    if (!animate) {
+      els.forEach((el, i) => {
+        if (!el || !plist[i]) return;
+        const p = plist[i];
+        el.style.transform = `translate3d(${p.x}px,${p.y}px,${p.z}px) rotateX(${p.rx}deg) rotateY(${p.ry}deg) rotateZ(${p.rz}deg)`;
+      });
+      onDone?.();
+      return;
+    }
 
-    sceneRef.current   = scene;
-    cameraRef.current  = camera;
-    rendererRef.current = renderer;
+    let done = 0;
+    els.forEach((el, i) => {
+      if (!el || !plist[i]) return;
+      const p    = plist[i];
+      const delay = i * 0.014 + Math.random() * 0.03;
 
-    // Build CSS3D objects for all flavours
-    const targets = getTargets("TABLE");
-    FLAVOURS.forEach((f, i) => {
-      const el  = buildCardEl(f, handleAdd);
-      const obj = new CSS3DObject(el);
-      obj.position.set(targets[i].x, targets[i].y, targets[i].z);
-      obj.rotation.set(
-        THREE.MathUtils.degToRad(targets[i].rotX),
-        THREE.MathUtils.degToRad(targets[i].rotY),
-        THREE.MathUtils.degToRad(targets[i].rotZ)
-      );
-      scene.add(obj);
-      objectsRef.current.push(obj);
+      // Scale dip mid-transition
+      gsap.to(el, {
+        scale: 0.72, opacity: 0.2,
+        duration: 0.28, delay,
+        ease: "power2.in",
+      });
+      gsap.to(el, {
+        scale: 1, opacity: 1,
+        duration: 0.42, delay: delay + 0.3,
+        ease: "back.out(1.6)",
+        onComplete() {
+          done++;
+          if (done === els.filter(Boolean).length) onDone?.();
+        },
+      });
+      gsap.to(el, {
+        x: p.x, y: p.y, z: p.z,
+        rotationX: p.rx, rotationY: p.ry, rotationZ: p.rz,
+        duration: 1.1,
+        delay,
+        ease: "power4.out",
+      });
     });
-
-    // Render loop
-    let running = true;
-    const animate = () => {
-      if (!running) return;
-      rafRef.current = requestAnimationFrame(animate);
-
-      // Inertia for sphere/helix drag
-      if (!isDraggingRef.current) {
-        velocityRef.current.x *= 0.92;
-        velocityRef.current.y *= 0.92;
-        targetRotRef.current.x += velocityRef.current.x;
-        targetRotRef.current.y += velocityRef.current.y;
-      }
-      rotationRef.current.x += (targetRotRef.current.x - rotationRef.current.x) * 0.08;
-      rotationRef.current.y += (targetRotRef.current.y - rotationRef.current.y) * 0.08;
-      scene.rotation.x = THREE.MathUtils.degToRad(rotationRef.current.x);
-      scene.rotation.y = THREE.MathUtils.degToRad(rotationRef.current.y);
-
-      renderer.render(scene, camera);
-    };
-    animate();
-
-    // Resize
-    const onResize = () => {
-      if (!containerRef.current) return;
-      const w = containerRef.current.clientWidth;
-      const h = containerRef.current.clientHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-    };
-    window.addEventListener("resize", onResize);
-
-    return () => {
-      running = false;
-      cancelAnimationFrame(rafRef.current);
-      window.removeEventListener("resize", onResize);
-      if (containerRef.current && renderer.domElement.parentNode === containerRef.current) {
-        containerRef.current.removeChild(renderer.domElement);
-      }
-    };
-  }, [handleAdd]);
-
-  // ── Drag / orbit controls ─────────────────────────────────────────────────
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    if (activeLayout !== "SPHERE" && activeLayout !== "HELIX") return;
-    isDraggingRef.current = true;
-    mouseDownRef.current  = { x: e.clientX, y: e.clientY };
-    velocityRef.current   = { x: 0, y: 0 };
-  }, [activeLayout]);
-
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDraggingRef.current) return;
-    const dx = e.clientX - mouseDownRef.current.x;
-    const dy = e.clientY - mouseDownRef.current.y;
-    velocityRef.current.y = dx * 0.12;
-    velocityRef.current.x = dy * 0.08;
-    targetRotRef.current.y += dx * 0.12;
-    targetRotRef.current.x += dy * 0.08;
-    mouseDownRef.current = { x: e.clientX, y: e.clientY };
   }, []);
 
-  const onPointerUp = useCallback(() => {
-    isDraggingRef.current = false;
-  }, []);
-
-  // ── Layout morph ─────────────────────────────────────────────────────────
+  // ── Morph to new layout ───────────────────────────────────────────────────
   const morphTo = useCallback((next: Layout) => {
-    if (transitioningRef.current || next === activeLayout) return;
-    transitioningRef.current = true;
-    setLayout(next);
+    if (morphing || next === layout) return;
+    setMorphing(true);
+    setTarget(next);
 
-    const targets = getTargets(next);
-
-    // Reset scene rotation for flat layouts
+    // Reset orbit for flat layouts
     if (next === "TABLE" || next === "GRID") {
-      gsap.to(rotationRef.current, {
-        x: 0, y: 0, duration: 1.2, ease: "power3.out",
+      gsap.to(orbitRef.current, {
+        x: 0, y: 0, duration: 0.8, ease: "power3.out",
         onUpdate: () => {
-          targetRotRef.current.x = rotationRef.current.x;
-          targetRotRef.current.y = rotationRef.current.y;
+          targetOrbitRef.current = { ...orbitRef.current };
+          if (sceneRef.current) {
+            sceneRef.current.style.transform =
+              `rotateX(${orbitRef.current.x}deg) rotateY(${orbitRef.current.y}deg)`;
+          }
         },
       });
     }
 
-    objectsRef.current.forEach((obj, i) => {
-      const t = targets[i];
-      const delay = i * 0.018 + Math.random() * 0.04;
-
-      // Mid-tween scale-dip (disintegration feel)
-      gsap.to(obj.element, {
-        scale: 0.7,
-        opacity: 0.3,
-        duration: 0.3,
-        delay,
-        ease: "power2.in",
-      });
-      gsap.to(obj.element, {
-        scale: 1,
-        opacity: 1,
-        duration: 0.45,
-        delay: delay + 0.38,
-        ease: "back.out(1.4)",
-      });
-
-      // Position + rotation
-      gsap.to(obj.position, {
-        x: t.x, y: t.y, z: t.z,
-        duration: 1.2,
-        delay,
-        ease: "power4.out",
-      });
-      gsap.to(obj.rotation, {
-        x: THREE.MathUtils.degToRad(t.rotX),
-        y: THREE.MathUtils.degToRad(t.rotY),
-        z: THREE.MathUtils.degToRad(t.rotZ),
-        duration: 1.2,
-        delay,
-        ease: "power4.out",
-        onComplete: i === FLAVOURS.length - 1 ? () => {
-          transitioningRef.current = false;
-          setActiveLayout(next);
-        } : undefined,
-      });
+    const plist = getPositions(next);
+    positions.current = plist;
+    applyPositions(plist, true, () => {
+      setLayout(next);
+      setMorphing(false);
     });
-  }, [activeLayout]);
+  }, [morphing, layout, applyPositions]);
 
-  // ── Category filter — show/hide objects ───────────────────────────────────
+  // ── Initial positions ─────────────────────────────────────────────────────
   useEffect(() => {
-    objectsRef.current.forEach((obj, i) => {
+    const plist = getPositions("GRID");
+    positions.current = plist;
+    // Slight delay so refs are all mounted
+    requestAnimationFrame(() => applyPositions(plist, false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Orbit animation loop ──────────────────────────────────────────────────
+  useEffect(() => {
+    let running = true;
+    const loop = () => {
+      if (!running) return;
+      rafOrbit.current = requestAnimationFrame(loop);
+      if (!isDragging.current) {
+        velRef.current.x *= 0.9;
+        velRef.current.y *= 0.9;
+        targetOrbitRef.current.x += velRef.current.x;
+        targetOrbitRef.current.y += velRef.current.y;
+      }
+      orbitRef.current.x += (targetOrbitRef.current.x - orbitRef.current.x) * 0.1;
+      orbitRef.current.y += (targetOrbitRef.current.y - orbitRef.current.y) * 0.1;
+      if (sceneRef.current) {
+        sceneRef.current.style.transform =
+          `rotateX(${orbitRef.current.x}deg) rotateY(${orbitRef.current.y}deg)`;
+      }
+    };
+    loop();
+    return () => { running = false; cancelAnimationFrame(rafOrbit.current); };
+  }, []);
+
+  // ── Pointer handlers (drag orbit) ─────────────────────────────────────────
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    isDragging.current = true;
+    lastPointer.current = { x: e.clientX, y: e.clientY };
+    velRef.current = { x: 0, y: 0 };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDragging.current) return;
+    const dx = e.clientX - lastPointer.current.x;
+    const dy = e.clientY - lastPointer.current.y;
+    velRef.current.y = dx * 0.25;
+    velRef.current.x = -dy * 0.18;
+    targetOrbitRef.current.y += dx * 0.25;
+    targetOrbitRef.current.x -= dy * 0.18;
+    lastPointer.current = { x: e.clientX, y: e.clientY };
+  }, []);
+
+  const onPointerUp = useCallback(() => {
+    isDragging.current = false;
+  }, []);
+
+  // ── Category filter — fade non-matches ────────────────────────────────────
+  useEffect(() => {
+    cardRefs.current.forEach((el, i) => {
+      if (!el) return;
       const f = FLAVOURS[i];
-      const show = categoryFilter === "All" || f.category === categoryFilter;
-      gsap.to(obj.element, {
-        opacity: show ? 1 : 0,
-        scale: show ? 1 : 0.6,
+      const visible = category === "All" || f.category === category;
+      gsap.to(el, {
+        opacity: visible ? 1 : 0,
+        scale: visible ? 1 : 0.7,
         duration: 0.35,
         ease: "power2.out",
-        pointerEvents: show ? "auto" : "none",
       });
-      obj.element.style.pointerEvents = show ? "auto" : "none";
+      el.style.pointerEvents = visible ? "auto" : "none";
     });
-  }, [categoryFilter]);
+  }, [category]);
 
-  // ── Walking cursor ────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (isMobile) return;
-    const cursor = cursorRef.current;
-    if (!cursor) return;
+  const handleAdd = useCallback((f: Flavour) => {
+    addToCart({ id: `flavour-${f.id}`, type: "flavour", name: f.name, price: f.price, quantity: 1 });
+  }, [addToCart]);
 
-    const onMove = (e: MouseEvent) => {
-      const dx = e.clientX - lastMouseRef.current.x;
+  const categories = useMemo(() =>
+    ["All", ...Array.from(new Set(FLAVOURS.map(f => f.category)))],
+  []);
 
-      // Flip direction
-      if (Math.abs(dx) > 2) {
-        flipRef.current = dx < 0;
-        cursor.style.transform = `scaleX(${flipRef.current ? -1 : 1})`;
+  const isDraggable = layout === "SPHERE" || layout === "HELIX";
+
+  // ── How big the scene container needs to be ───────────────────────────────
+  const sceneH = useMemo(() => {
+    switch (layout) {
+      case "SPHERE": return Math.max(420, CARD_W * 1.8) * 2 + CARD_H;
+      case "HELIX":  return (FLAVOURS.length / 2) * 90 + CARD_H;
+      case "TABLE":  return 9 * (CARD_H + 20) + CARD_H;
+      case "GRID": {
+        const cols = isMobile ? 2 : 4;
+        return Math.ceil(FLAVOURS.length / cols) * (CARD_H + 28) + CARD_H;
       }
-
-      cursor.style.left = `${e.clientX - 12}px`;
-      cursor.style.top  = `${e.clientY - 44}px`;
-      lastMouseRef.current = { x: e.clientX, y: e.clientY };
-
-      movingRef.current = true;
-      if (movingTimerRef.current) clearTimeout(movingTimerRef.current);
-      movingTimerRef.current = setTimeout(() => {
-        movingRef.current = false;
-      }, 200);
-    };
-
-    // Walk frame cycle
-    if (frameTimerRef.current) clearInterval(frameTimerRef.current);
-    frameTimerRef.current = setInterval(() => {
-      if (!cursor) return;
-      if (movingRef.current) {
-        frameRef.current = (frameRef.current + 1) % WALK_FRAMES.length;
-      } else {
-        frameRef.current = 0;
-      }
-      cursor.innerHTML = WALK_FRAMES[frameRef.current];
-    }, 120);
-
-    window.addEventListener("mousemove", onMove, { passive: true });
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      if (frameTimerRef.current) clearInterval(frameTimerRef.current);
-      if (movingTimerRef.current) clearTimeout(movingTimerRef.current);
-    };
-  }, [isMobile]);
-
-  // ── Camera zoom for sphere/helix ──────────────────────────────────────────
-  useEffect(() => {
-    if (!cameraRef.current) return;
-    const z = layout === "SPHERE" ? 2200 : layout === "HELIX" ? 1600 : 1800;
-    gsap.to(cameraRef.current.position, { z, duration: 1.4, ease: "power3.inOut" });
-  }, [layout]);
-
-  const categories = ["All", ...Array.from(new Set(FLAVOURS.map((f) => f.category)))];
+    }
+  }, [layout, isMobile]);
 
   return (
     <section
@@ -564,95 +733,109 @@ export default function FlavourWall() {
         overflow: "hidden",
       }}
     >
-      {/* ── Ambient nebula bg ── */}
+      {/* Nebula bg */}
       <div style={{
         position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
         background: `
-          radial-gradient(ellipse 60% 50% at 30% 20%, rgba(124,58,237,0.12) 0%, transparent 60%),
-          radial-gradient(ellipse 40% 60% at 80% 70%, rgba(6,182,212,0.08) 0%, transparent 55%),
-          radial-gradient(ellipse 50% 40% at 60% 40%, rgba(232,121,249,0.05) 0%, transparent 70%)
+          radial-gradient(ellipse 55% 40% at 20% 20%, rgba(124,58,237,0.13) 0%, transparent 65%),
+          radial-gradient(ellipse 40% 55% at 80% 75%, rgba(6,182,212,0.09) 0%, transparent 60%),
+          radial-gradient(ellipse 60% 35% at 60% 50%, rgba(232,121,249,0.06) 0%, transparent 70%)
         `,
       }} />
 
-      {/* ── Star field canvas ── */}
-      <StarField />
-
       {/* ── Header ── */}
       <div style={{
-        position: "relative", zIndex: 10, textAlign: "center",
-        padding: "clamp(48px,7vw,80px) 5vw 0",
+        position: "relative", zIndex: 10,
+        textAlign: "center",
+        padding: "clamp(52px,7vw,88px) 5vw 0",
         pointerEvents: "none",
       }}>
         <p style={{
-          fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.28em",
-          color: "var(--cyan-bright)", textTransform: "uppercase", marginBottom: 14, opacity: 0.8,
+          fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.3em",
+          color: "var(--cyan-bright)", textTransform: "uppercase", marginBottom: 16, opacity: 0.8,
         }}>
-          25 Premium Blends
+          {FLAVOURS.length} Premium Blends
         </p>
         <h2 style={{
           fontFamily: "var(--font-bebas)", fontWeight: 400,
-          fontSize: "clamp(52px,7vw,96px)", lineHeight: 0.95, letterSpacing: "0.04em",
-          textTransform: "uppercase", color: "#fff", marginBottom: 12,
+          fontSize: "clamp(56px,7vw,100px)", lineHeight: 0.92,
+          letterSpacing: "0.04em", textTransform: "uppercase",
+          color: "#fff", marginBottom: 16,
         }}>
           The Flavour <span style={{ color: "var(--cyan-bright)" }}>Wall.</span>
         </h2>
         <p style={{
-          fontFamily: "var(--font-barlow)", fontSize: "clamp(13px,2vw,16px)",
-          color: "rgba(255,255,255,0.5)", maxWidth: 420, margin: "0 auto",
+          fontFamily: "var(--font-barlow)", fontSize: "clamp(13px,1.8vw,16px)",
+          color: "rgba(255,255,255,0.45)", maxWidth: 400, margin: "0 auto",
         }}>
-          Every session begins with a choice.
+          36 premium blends, four ways to explore. Click any card to go deeper.
         </p>
       </div>
 
       {/* ── Layout switcher ── */}
       <div style={{
-        position: "relative", zIndex: 10, display: "flex", justifyContent: "center",
-        gap: 8, marginTop: 28, marginBottom: 8,
+        position: "relative", zIndex: 10,
+        display: "flex", justifyContent: "center", gap: isMobile ? 6 : 10,
+        flexWrap: "wrap",
+        padding: isMobile ? "28px 16px 0" : "32px 5vw 0",
       }}>
-        {LAYOUTS.map((l) => (
+        {(["TABLE","SPHERE","HELIX","GRID"] as Layout[]).map((l) => (
           <button
             key={l}
             onClick={() => morphTo(l)}
-            title={l}
+            disabled={morphing}
             style={{
-              width: 44, height: 44, borderRadius: 10, border: "1px solid",
-              borderColor: activeLayout === l ? "var(--cyan-bright)" : "rgba(255,255,255,0.12)",
-              background: activeLayout === l ? "rgba(34,211,238,0.12)" : "rgba(255,255,255,0.03)",
-              color: activeLayout === l ? "var(--cyan-bright)" : "rgba(255,255,255,0.4)",
-              cursor: "pointer", transition: "all 0.25s ease",
-              display: "flex", alignItems: "center", justifyContent: "center",
+              fontFamily: "var(--font-barlow)", fontWeight: 700,
+              fontSize: isMobile ? 11 : 12,
+              letterSpacing: "0.1em", textTransform: "uppercase",
+              padding: isMobile ? "8px 14px" : "10px 20px",
+              borderRadius: 10,
+              border: `1px solid ${targetLayout === l ? "var(--cyan-bright)" : "rgba(255,255,255,0.1)"}`,
+              background: targetLayout === l ? "rgba(34,211,238,0.12)" : "rgba(255,255,255,0.03)",
+              color: targetLayout === l ? "var(--cyan-bright)" : "rgba(255,255,255,0.4)",
+              cursor: morphing ? "not-allowed" : "pointer",
+              transition: "all 0.25s ease",
               backdropFilter: "blur(8px)",
+              opacity: morphing && targetLayout !== l ? 0.5 : 1,
             }}
-            dangerouslySetInnerHTML={{ __html: LAYOUT_ICONS[l] }}
-          />
+          >
+            {LAYOUT_META[l].label}
+          </button>
         ))}
-        <div style={{
-          position: "absolute", bottom: -22, left: "50%", transform: "translateX(-50%)",
-          fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.18em",
-          color: "rgba(255,255,255,0.3)", textTransform: "uppercase", whiteSpace: "nowrap",
-        }}>
-          {activeLayout === "SPHERE" || activeLayout === "HELIX" ? "drag to rotate · click to select" : "click to select"}
-        </div>
       </div>
+
+      {/* Hint text */}
+      <p style={{
+        position: "relative", zIndex: 10, textAlign: "center",
+        marginTop: 10,
+        fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.2em",
+        textTransform: "uppercase", color: "rgba(255,255,255,0.25)",
+      }}>
+        {LAYOUT_META[targetLayout].hint}
+        {isDraggable && " · all axes"}
+      </p>
 
       {/* ── Category filter ── */}
       <div style={{
-        position: "relative", zIndex: 10, display: "flex", justifyContent: "center",
-        gap: 8, flexWrap: "wrap", padding: "32px 5vw 0",
+        position: "relative", zIndex: 10,
+        display: "flex", justifyContent: "center",
+        gap: 8, flexWrap: "wrap",
+        padding: isMobile ? "16px 12px 0" : "20px 5vw 0",
       }}>
         {categories.map((cat) => (
           <button
             key={cat}
-            onClick={() => setCategoryFilter(cat)}
+            onClick={() => setCategory(cat)}
             style={{
-              fontFamily: "var(--font-barlow)", fontWeight: 700, fontSize: 10,
-              letterSpacing: "0.12em", textTransform: "uppercase",
-              padding: "6px 14px", borderRadius: 24,
-              border: `1px solid ${categoryFilter === cat ? "var(--cyan-bright)" : "rgba(255,255,255,0.1)"}`,
-              background: categoryFilter === cat ? "rgba(34,211,238,0.1)" : "rgba(255,255,255,0.03)",
-              color: categoryFilter === cat ? "var(--cyan-bright)" : "rgba(255,255,255,0.45)",
+              fontFamily: "var(--font-barlow)", fontWeight: 700,
+              fontSize: isMobile ? 10 : 11,
+              letterSpacing: "0.1em", textTransform: "uppercase",
+              padding: isMobile ? "6px 12px" : "6px 16px",
+              borderRadius: 24, minHeight: 36,
+              border: `1px solid ${category === cat ? "var(--cyan-bright)" : "rgba(255,255,255,0.08)"}`,
+              background: category === cat ? "rgba(34,211,238,0.1)" : "transparent",
+              color: category === cat ? "var(--cyan-bright)" : "rgba(255,255,255,0.4)",
               cursor: "pointer", transition: "all 0.2s ease",
-              backdropFilter: "blur(6px)",
             }}
           >
             {cat}
@@ -660,9 +843,9 @@ export default function FlavourWall() {
         ))}
       </div>
 
-      {/* ── 3D CSS Renderer container ── */}
+      {/* ── 3D Stage ── */}
       <div
-        ref={containerRef}
+        ref={wrapRef}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -670,95 +853,58 @@ export default function FlavourWall() {
         style={{
           position: "relative", zIndex: 5,
           width: "100%",
-          height: isMobile ? "70vh" : "78vh",
-          cursor: activeLayout === "SPHERE" || activeLayout === "HELIX" ? "grab" : "default",
-          marginTop: 8,
+          height: Math.max(sceneH, isMobile ? 500 : 700),
+          overflow: "visible",
+          perspective: "1200px",
+          perspectiveOrigin: "50% 50%",
+          cursor: isDraggable ? (isDragging.current ? "grabbing" : "grab") : "default",
           touchAction: "none",
+          marginTop: 24,
+          userSelect: "none",
         }}
-      />
-
-      {/* ── Walking cursor ── */}
-      {!isMobile && (
+      >
+        {/* Scene root — rotated by orbit */}
         <div
-          ref={cursorRef}
+          ref={sceneRef}
           style={{
-            position: "fixed", zIndex: 9999, pointerEvents: "none",
-            width: 24, height: 48, top: 0, left: 0,
-            filter: "drop-shadow(0 0 6px rgba(34,211,238,0.7))",
-            transition: "transform 0.1s ease",
+            position: "absolute",
+            top: "50%", left: "50%",
+            transformStyle: "preserve-3d",
+            willChange: "transform",
           }}
-          dangerouslySetInnerHTML={{ __html: WALK_FRAMES[0] }}
-        />
-      )}
+        >
+          {FLAVOURS.map((f, i) => (
+            <FlavourCard
+              key={f.id}
+              flavour={f}
+              visible={category === "All" || f.category === category}
+              onClick={() => setSelected(f)}
+              ref={(el) => { cardRefs.current[i] = el; }}
+            />
+          ))}
+        </div>
+      </div>
 
-      {/* ── Bottom count ── */}
+      {/* ── Footer count ── */}
       <p style={{
         position: "relative", zIndex: 10, textAlign: "center",
-        padding: "16px 0 clamp(48px,6vw,80px)",
-        fontFamily: "var(--font-mono)", fontSize: 10,
-        color: "rgba(255,255,255,0.2)", letterSpacing: "0.14em",
+        padding: "24px 0 clamp(48px,6vw,80px)",
+        fontFamily: "var(--font-mono)", fontSize: 9,
+        color: "rgba(255,255,255,0.18)", letterSpacing: "0.16em",
+        textTransform: "uppercase",
       }}>
-        {categoryFilter === "All" ? FLAVOURS.length : FLAVOURS.filter(f => f.category === categoryFilter).length} blends · {activeLayout.toLowerCase()} view
+        {category === "All" ? FLAVOURS.length : FLAVOURS.filter(f => f.category === category).length} blends · {layout.toLowerCase()} view
+        {morphing && " · morphing..."}
       </p>
+
+      {/* ── Detail modal ── */}
+      {selectedFlavour && (
+        <FlavourModal
+          flavour={selectedFlavour}
+          onClose={() => setSelected(null)}
+          onAdd={handleAdd}
+        />
+      )}
     </section>
-  );
-}
-
-// ─── Star field background ────────────────────────────────────────────────────
-function StarField() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const resize = () => {
-      canvas.width  = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-    };
-    resize();
-
-    const stars = Array.from({ length: 180 }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      r: Math.random() * 1.2,
-      a: Math.random(),
-      speed: 0.002 + Math.random() * 0.004,
-      phase: Math.random() * Math.PI * 2,
-    }));
-
-    let raf = 0;
-    let t = 0;
-    const draw = () => {
-      raf = requestAnimationFrame(draw);
-      t += 0.016;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      stars.forEach((s) => {
-        const alpha = s.a * (0.4 + 0.6 * Math.sin(t * s.speed * 60 + s.phase));
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(180,160,255,${alpha})`;
-        ctx.fill();
-      });
-    };
-    draw();
-
-    window.addEventListener("resize", resize);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", resize);
-    };
-  }, []);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        position: "absolute", inset: 0, width: "100%", height: "100%",
-        zIndex: 1, pointerEvents: "none",
-      }}
-    />
   );
 }
