@@ -7,6 +7,11 @@ import { FLAVOURS, getStockStatus, type Flavour } from "@/data/flavours";
 import { useStore } from "@/store/useStore";
 import { useIsMobile } from "@/context/MobileContext";
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function kes(amount: number) {
+  return `KES ${amount.toLocaleString("en-KE")}`;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 type Layout = "SPHERE" | "HELIX";
 
@@ -300,7 +305,7 @@ const FlavourModal = memo(function FlavourModal({
                 fontFamily: "var(--font-mono)", fontSize: 28, fontWeight: 700,
                 color: accent, lineHeight: 1,
               }}>
-                ${flavour.price.toFixed(2)}
+                {kes(flavour.price)}
               </p>
             </div>
             <div style={{ flex: 1, display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
@@ -481,7 +486,7 @@ function FlavourCard({ flavour, onSelect }, ref) {
             fontFamily: "var(--font-mono)", fontSize: 17,
             fontWeight: 700, color: accent, flexShrink: 0,
           }}>
-            ${flavour.price.toFixed(2)}
+            {kes(flavour.price)}
           </span>
           <span style={{
             fontFamily: "var(--font-barlow)", fontWeight: 700, fontSize: 10,

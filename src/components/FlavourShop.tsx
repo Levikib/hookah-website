@@ -15,9 +15,11 @@ const SIZE_OPTIONS: { label: Size; mult: number }[] = [
 
 function calcPrice(base: number, size: Size): number {
   const opt = SIZE_OPTIONS.find((s) => s.label === size)!;
-  if (opt.mult === 1) return base;
-  const raw = base * opt.mult;
-  return Math.floor(raw) + 0.99;
+  return Math.round(base * opt.mult);
+}
+
+function kes(amount: number) {
+  return `KES ${amount.toLocaleString("en-KE")}`;
 }
 
 // ── CSS-only glass jar SVG-free component ──────────────────────────────────
@@ -267,7 +269,7 @@ function JarCard({
                 fontWeight: 700,
               }}
             >
-              ${flavour.price.toFixed(2)} / 50g
+              {kes(flavour.price)} / 50g
             </span>
           </div>
         )}
@@ -296,7 +298,7 @@ function JarCard({
             marginTop: 2,
           }}
         >
-          ${flavour.price.toFixed(2)}
+          {kes(flavour.price)}
         </div>
       </div>
 
@@ -373,7 +375,7 @@ function JarCard({
                   }}
                 >
                   <div style={{ fontWeight: 700 }}>{label}</div>
-                  <div style={{ opacity: 0.75, fontSize: 8 }}>${szPrice.toFixed(0)}</div>
+                  <div style={{ opacity: 0.75, fontSize: 8 }}>{kes(szPrice)}</div>
                 </button>
               );
             })}
@@ -422,7 +424,7 @@ function JarCard({
               fontWeight: 700,
             }}
           >
-            ${price.toFixed(2)}
+            {kes(price)}
           </div>
         </div>
       )}
@@ -599,7 +601,7 @@ function CounterBar({ cartCount, cartTotal, onViewBag }: CounterBarProps) {
               : `${cartCount} compound${cartCount !== 1 ? "s" : ""} selected · `}
             {cartCount > 0 && (
               <span style={{ color: "var(--gold)", fontWeight: 700 }}>
-                Total: ${cartTotal.toFixed(2)}
+                Total: {kes(cartTotal)}
               </span>
             )}
           </div>

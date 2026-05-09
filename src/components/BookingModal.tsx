@@ -6,6 +6,10 @@ import { FLAVOURS } from "@/data/flavours";
 import type { Flavour } from "@/data/flavours";
 import { useIsMobile } from "@/context/MobileContext";
 
+function kes(amount: number) {
+  return `KES ${amount.toLocaleString("en-KE")}`;
+}
+
 // ── Session emoji map ────────────────────────────────────────────────────────
 const SESSION_EMOJI: Record<string, string> = {
   solo:      "🌙",
@@ -218,7 +222,7 @@ function Step1Session({ isMobile }: { isMobile: boolean }) {
                 fontWeight: 700,
                 color: s.isCustom ? "var(--orange)" : "var(--gold)",
               }}>
-                {s.isCustom ? "Custom" : `$${s.price.toFixed(2)}`}
+                {s.isCustom ? "Custom" : kes(s.price)}
               </div>
             </button>
           );
@@ -646,7 +650,7 @@ function Step3Flavours({ isMobile }: { isMobile: boolean }) {
                 fontSize: 13,
                 color: "var(--gold)",
               }}>
-                ${f.price.toFixed(2)}
+                {kes(f.price)}
               </div>
             </button>
           );
@@ -662,7 +666,7 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
 
   const { session, date, timeSlot, location, deliveryAddress, selectedFlavours, promoCode } = booking;
 
-  const deliveryFee = location === "delivery" ? 15 : 0;
+  const deliveryFee = location === "delivery" ? 2000 : 0;
   const sessionPrice = session?.isCustom ? 0 : (session?.price ?? 0);
   const flavourTotal = selectedFlavours.reduce((s, f) => s + f.price, 0);
   const total = sessionPrice + flavourTotal + deliveryFee;
@@ -775,7 +779,7 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
                       {f.emoji} {f.name}
                     </span>
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--gold)" }}>
-                      ${f.price.toFixed(2)}
+                      {kes(f.price)}
                     </span>
                   </div>
                 ))}
@@ -797,11 +801,11 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
               Price Breakdown
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <PriceLine label={session?.name ?? "Session"} value={session?.isCustom ? "Custom" : `$${sessionPrice.toFixed(2)}`} />
+              <PriceLine label={session?.name ?? "Session"} value={session?.isCustom ? "Custom" : kes(sessionPrice)} />
               {selectedFlavours.map((f) => (
-                <PriceLine key={f.id} label={`${f.emoji} ${f.name}`} value={`$${f.price.toFixed(2)}`} muted />
+                <PriceLine key={f.id} label={`${f.emoji} ${f.name}`} value={kes(f.price)} muted />
               ))}
-              {deliveryFee > 0 && <PriceLine label="Delivery Fee" value={`$${deliveryFee.toFixed(2)}`} muted />}
+              {deliveryFee > 0 && <PriceLine label="Delivery Fee" value={kes(deliveryFee)} muted />}
               <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "4px 0" }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontFamily: "var(--font-barlow)", fontWeight: 700, fontSize: 15, color: "var(--text-primary)" }}>Total</span>
@@ -812,7 +816,7 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
                   color: "var(--gold)",
                   textShadow: "0 0 20px rgba(245,158,11,0.5)",
                 }}>
-                  {session?.isCustom ? "TBD" : `$${total.toFixed(2)}`}
+                  {session?.isCustom ? "TBD" : kes(total)}
                 </span>
               </div>
             </div>

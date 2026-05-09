@@ -1,6 +1,10 @@
 "use client";
 import { useStore } from "@/store/useStore";
 
+function kes(amount: number) {
+  return `KES ${amount.toLocaleString("en-KE")}`;
+}
+
 export default function CartDrawer() {
   const cartOpen = useStore((s) => s.cartOpen);
   const setCartOpen = useStore((s) => s.setCartOpen);
@@ -166,7 +170,7 @@ export default function CartDrawer() {
                         marginTop: 2,
                       }}
                     >
-                      ${item.price.toFixed(2)} ea
+                      {kes(item.price)} ea
                     </p>
                   </div>
 
@@ -244,7 +248,7 @@ export default function CartDrawer() {
                       textAlign: "right",
                     }}
                   >
-                    ${(item.price * item.quantity).toFixed(2)}
+                    {kes(item.price * item.quantity)}
                   </p>
                 </div>
               ))}
@@ -287,7 +291,7 @@ export default function CartDrawer() {
                   fontWeight: 700,
                 }}
               >
-                ${cartTotal.toFixed(2)}
+                {kes(cartTotal)}
               </span>
             </div>
 
