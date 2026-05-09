@@ -8,7 +8,7 @@ import { useStore } from "@/store/useStore";
 import { useIsMobile } from "@/context/MobileContext";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-type Layout = "SPHERE" | "HELIX" | "GRID";
+type Layout = "SPHERE" | "HELIX";
 
 const CARD_W = 180;
 const CARD_H = 220;
@@ -34,9 +34,8 @@ const INTENSITY_COLORS: Record<string, string> = {
 };
 
 const LAYOUT_META: Record<Layout, { label: string; hint: string }> = {
-  SPHERE: { label: "Sphere View", hint: "Drag to rotate the flavour globe" },
-  HELIX:  { label: "Helix View",  hint: "Drag to spin the DNA spiral" },
-  GRID:   { label: "Grid View",   hint: "Drag to orbit — depth reveals layers" },
+  SPHERE: { label: "Sphere View", hint: "Click & drag to rotate · click any card to explore" },
+  HELIX:  { label: "Helix View",  hint: "Click & drag to spin · click any card to explore" },
 };
 
 // ─── Position types ───────────────────────────────────────────────────────────
@@ -74,39 +73,10 @@ function helixPos(): Pos[] {
   });
 }
 
-function gridPos(): Pos[] {
-  // 6×3×2 cuboid: 6 cols, 3 rows per layer, 2 layers deep.
-  // 6×3×2 = 36 slots exactly — every card accessible.
-  // Layer z-gap 280px: visible depth without being unreachable.
-  const COLS   = 6;
-  const ROWS   = 3;
-  const gapX = CARD_W + 22;
-  const gapY = CARD_H + 22;
-  const gapZ = 280;
-  const padX = ((COLS - 1) * gapX) / 2;
-  const padY = ((ROWS - 1) * gapY) / 2;
-
-  return FLAVOURS.map((_, i) => {
-    const layer = Math.floor(i / (COLS * ROWS));
-    const rem   = i % (COLS * ROWS);
-    const col   = rem % COLS;
-    const row   = Math.floor(rem / COLS);
-    return {
-      x:   col * gapX - padX,
-      y:   row * gapY - padY,
-      z:  -layer * gapZ,
-      rx:  0,
-      ry:  0,
-      rz:  0,
-    };
-  });
-}
-
 function getPositions(layout: Layout): Pos[] {
   switch (layout) {
     case "SPHERE": return spherePos();
     case "HELIX":  return helixPos();
-    case "GRID":   return gridPos();
   }
 }
 
@@ -374,28 +344,40 @@ const FlavourModal = memo(function FlavourModal({
 });
 
 // ─── Individual card ──────────────────────────────────────────────────────────
-interface CardProps { flavour: Flavour; onClick: () => void; }
+interface CardProps { flavour: Flavour; onSelect: () => void; }
 
 const FlavourCard = forwardRef<HTMLDivElement, CardProps>(
-function FlavourCard({ flavour, onClick }, ref) {
+function FlavourCard({ flavour, onSelect }, ref) {
   const accent   = CATEGORY_COLORS[flavour.category] ?? "#22d3ee";
   const intColor = INTENSITY_COLORS[flavour.intensity];
   const stock    = getStockStatus(flavour.stock);
+  // Track pointer down position on the card itself to distinguish tap from drag
+  const cardDownPos = useRef({ x: 0, y: 0 });
 
   return (
     <div
       data-flavour-id={flavour.id}
       ref={ref}
-      onClick={onClick}
+      onPointerDown={(e) => {
+        cardDownPos.current = { x: e.clientX, y: e.clientY };
+        e.stopPropagation(); // prevent stage drag starting from card
+      }}
+      onPointerUp={(e) => {
+        const dx = e.clientX - cardDownPos.current.x;
+        const dy = e.clientY - cardDownPos.current.y;
+        // Fire selection only if pointer barely moved (tap, not drag)
+        if (Math.sqrt(dx * dx + dy * dy) < 8) {
+          e.stopPropagation();
+          onSelect();
+        }
+      }}
       style={{
         width: CARD_W,
         height: CARD_H,
         position: "absolute",
-        // No CSS transform — GSAP drives all transform including offset
         willChange: "transform",
         transformStyle: "preserve-3d",
         cursor: "pointer",
-        // Start invisible until useLayoutEffect places them
         opacity: 0,
       }}
     >
@@ -523,12 +505,11 @@ export default function FlavourWall() {
   const isMobile = useIsMobile();
   const addToCart = useStore((s) => s.addToCart);
 
-  const [layout, setLayout]       = useState<Layout>("SPHERE");
-  const [category, setCategory]   = useState("All");
+  const [layout, setLayout]            = useState<Layout>("SPHERE");
+  const [targetLayout, setTarget]      = useState<Layout>("SPHERE");
+  const [category, setCategory]        = useState("All");
   const [selectedFlavour, setSelected] = useState<Flavour | null>(null);
-  const [morphing, setMorphing]   = useState(false);
-  // Track target layout for button highlight
-  const [targetLayout, setTarget] = useState<Layout>("SPHERE");
+  const [morphing, setMorphing]        = useState(false);
 
   const sceneRef  = useRef<HTMLDivElement>(null);
   const cardRefs  = useRef<(HTMLDivElement | null)[]>([]);
@@ -537,7 +518,8 @@ export default function FlavourWall() {
   const orbitRef       = useRef({ x: 0, y: 0 });
   const targetOrbitRef = useRef({ x: 0, y: 0 });
   const velRef         = useRef({ x: 0, y: 0 });
-  const isDragging     = useRef(false);
+  const pointerIsDown  = useRef(false); // true only while button held
+  const isDragging     = useRef(false); // true only after 6px movement
   const pointerDownPos = useRef({ x: 0, y: 0 });
   const lastPointer    = useRef({ x: 0, y: 0 });
   const rafOrbit       = useRef<number>(0);
@@ -576,10 +558,6 @@ export default function FlavourWall() {
         velRef.current.y *= 0.88;
         targetOrbitRef.current.x += velRef.current.x;
         targetOrbitRef.current.y += velRef.current.y;
-      }
-      // Clamp X for grid so it doesn't flip
-      if (currentLayout.current === "GRID") {
-        targetOrbitRef.current.x = Math.max(-60, Math.min(60, targetOrbitRef.current.x));
       }
       orbitRef.current.x += (targetOrbitRef.current.x - orbitRef.current.x) * 0.1;
       orbitRef.current.y += (targetOrbitRef.current.y - orbitRef.current.y) * 0.1;
@@ -673,30 +651,35 @@ export default function FlavourWall() {
 
   // ── Pointer handlers ──────────────────────────────────────────────────────
   const onPointerDown = useCallback((e: React.PointerEvent) => {
-    isDragging.current = false; // reset — only becomes true if we actually move
+    // Only react to primary button (left click / touch)
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    pointerIsDown.current = true;
+    isDragging.current = false;
     pointerDownPos.current = { x: e.clientX, y: e.clientY };
-    lastPointer.current = { x: e.clientX, y: e.clientY };
+    lastPointer.current    = { x: e.clientX, y: e.clientY };
     velRef.current = { x: 0, y: 0 };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }, []);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
+    // Ignore hover — only act when pointer button is held
+    if (!pointerIsDown.current) return;
     const dx = e.clientX - pointerDownPos.current.x;
     const dy = e.clientY - pointerDownPos.current.y;
-    // Only start orbit drag after moving 6px — preserves card click detection
-    if (!isDragging.current && Math.sqrt(dx*dx + dy*dy) < 6) return;
+    // 8px threshold before orbit starts — gives cards room to be clicked
+    if (!isDragging.current && Math.sqrt(dx * dx + dy * dy) < 8) return;
     isDragging.current = true;
     const mdx = e.clientX - lastPointer.current.x;
     const mdy = e.clientY - lastPointer.current.y;
-    velRef.current.y = mdx * 0.25;
-    velRef.current.x = -mdy * 0.18;
-    targetOrbitRef.current.y += mdx * 0.25;
-    targetOrbitRef.current.x -= mdy * 0.18;
+    velRef.current.y = mdx * 0.22;
+    velRef.current.x = -mdy * 0.15;
+    targetOrbitRef.current.y += mdx * 0.22;
+    targetOrbitRef.current.x -= mdy * 0.15;
     lastPointer.current = { x: e.clientX, y: e.clientY };
   }, []);
 
-  const onPointerUp = useCallback(() => {
-    isDragging.current = false;
+  const onPointerUp = useCallback((e: React.PointerEvent) => {
+    pointerIsDown.current = false;
+    isDragging.current    = false;
   }, []);
 
   // ── Category filter via GSAP — does NOT re-morph ──────────────────────────
@@ -723,8 +706,6 @@ export default function FlavourWall() {
     ["All", ...Array.from(new Set(FLAVOURS.map(f => f.category)))],
   []);
 
-  // Sphere radius 500 → cards reach ±500px from center → need 1200px minimum.
-  // Extra headroom lets you orbit to top/bottom views without clipping.
   const stageH = isMobile ? 700 : 1100;
 
   return (
@@ -783,7 +764,7 @@ export default function FlavourWall() {
         flexWrap: "wrap",
         padding: isMobile ? "28px 16px 0" : "32px 5vw 0",
       }}>
-        {(["SPHERE", "HELIX", "GRID"] as Layout[]).map((l) => (
+        {(["SPHERE", "HELIX"] as Layout[]).map((l) => (
           <button
             key={l}
             onClick={() => morphTo(l)}
@@ -881,7 +862,7 @@ export default function FlavourWall() {
             <FlavourCard
               key={f.id}
               flavour={f}
-              onClick={() => setSelected(f)}
+              onSelect={() => setSelected(f)}
               ref={(el) => { cardRefs.current[i] = el; }}
             />
           ))}
