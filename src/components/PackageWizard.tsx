@@ -89,10 +89,10 @@ const OCCASIONS = [
 function StepOccasion({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <p style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: 18, color: "rgba(240,235,255,0.55)", marginBottom: 28 }}>
+      <p style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: "clamp(14px,3vw,18px)", color: "rgba(240,235,255,0.55)", marginBottom: 20 }}>
         Every great session starts with knowing the occasion.
       </p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+      <div className="wiz-occ-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(180px,calc(50% - 6px)), 1fr))", gap: 10 }}>
         {OCCASIONS.map(occ => {
           const active = value === occ.id;
           return (
@@ -126,7 +126,7 @@ function StepHookah({
       </p>
 
       {/* Hookah grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 36 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(160px,calc(50% - 6px)), 1fr))", gap: 10, marginBottom: 28 }}>
         {RENTAL_MODELS.map(m => {
           const active = model?.id === m.id;
           const rgb    = hexRgb(m.accentColor);
@@ -212,7 +212,7 @@ function StepFlavours({
       </div>
 
       {/* Flavour grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(168px, 1fr))", gap: 10, maxHeight: 400, overflowY: "auto", paddingRight: 4 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(150px,calc(50% - 5px)), 1fr))", gap: 8, maxHeight: "min(400px,50vh)", overflowY: "auto", paddingRight: 4 }}>
         {filtered.map(f => {
           const active  = selected.includes(f.id);
           const isOut   = getStockStatus(f.stock) === "out";
@@ -264,7 +264,7 @@ function StepAddons({ selected, onChange }: { selected: string[]; onChange: (ids
       <p style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: 18, color: "rgba(240,235,255,0.55)", marginBottom: 28 }}>
         The extras that separate a session from an experience.
       </p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+      <div className="wiz-addon-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(180px,calc(50% - 6px)), 1fr))", gap: 10 }}>
         {ADDONS.map(addon => {
           const active = selected.includes(addon.id);
           return (
@@ -334,7 +334,7 @@ function StepReview({
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "min(100%, 1fr) min(100%, 1fr)", gap: 20 }} className="wiz-review-grid">
       {/* Left: summary */}
       <div>
         <p style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: 18, color: "rgba(240,235,255,0.55)", marginBottom: 24 }}>
@@ -500,7 +500,7 @@ function ProgressBar({ current, steps, onGoto }: { current: number; steps: typeo
             }}>
               {done ? "✓" : meta.icon}
             </div>
-            <div style={{
+            <div className="wiz-step-label" style={{
               fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.14em",
               textTransform: "uppercase",
               color: active ? "var(--violet-bright)" : done ? "var(--cyan-bright)" : "rgba(255,255,255,0.25)",
@@ -594,6 +594,30 @@ export default function PackageWizard() {
         .wiz-scrollbar::-webkit-scrollbar { width: 3px; }
         .wiz-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .wiz-scrollbar::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.5); border-radius: 2px; }
+        /* Live price bar on mobile sits at bottom */
+        @media (min-width: 768px) {
+          .wiz-layout { grid-template-columns: 1fr 260px !important; }
+          .wiz-price-sidebar { position: sticky !important; top: 100px; }
+        }
+        @media (max-width: 767px) {
+          .wiz-price-sidebar { order: -1; }
+          .wiz-price-sidebar-inner { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+          .wiz-price-sidebar-inner > * { flex: 1; min-width: 120px; }
+        }
+        @media (min-width: 640px) {
+          .wiz-review-grid { grid-template-columns: 1fr 1fr !important; }
+        }
+        @media (max-width: 639px) {
+          .wiz-review-grid { grid-template-columns: 1fr !important; }
+        }
+        /* Progress bar labels hide on very narrow */
+        @media (max-width: 380px) {
+          .wiz-step-label { display: none !important; }
+        }
+        /* Occasion / addon grid: 1 col on very small */
+        @media (max-width: 360px) {
+          .wiz-occ-grid, .wiz-addon-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
 
       {/* Nebula backdrop */}
@@ -635,14 +659,14 @@ export default function PackageWizard() {
         </div>
 
         {/* Main wizard layout */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: 28, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 20, alignItems: "start" }} className="wiz-layout">
 
           {/* Left: wizard */}
           <div style={{
             background: "rgba(255,255,255,0.025)",
             border: "1px solid rgba(255,255,255,0.08)",
             borderRadius: 20,
-            padding: "32px 32px 28px",
+            padding: "clamp(16px,4vw,32px) clamp(16px,4vw,32px) clamp(16px,4vw,28px)",
           }}>
             <ProgressBar current={stepIdx} steps={STEPS} onGoto={gotoStep} />
 
@@ -701,11 +725,10 @@ export default function PackageWizard() {
           </div>
 
           {/* Right: live price ticker */}
-          <div style={{
+          <div className="wiz-price-sidebar" style={{
             background: "rgba(255,255,255,0.025)",
             border: "1px solid rgba(255,255,255,0.07)",
-            borderRadius: 20, padding: "24px 20px",
-            position: "sticky", top: 100,
+            borderRadius: 20, padding: "20px",
           }}>
             <div style={{ fontFamily: "var(--font-bebas)", fontSize: 13, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginBottom: 20 }}>Live Price</div>
 

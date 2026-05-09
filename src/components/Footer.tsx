@@ -68,7 +68,7 @@ function NewsletterForm() {
       }}>
         Join the circle. First to know about drops & events.
       </p>
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <input
           type="email"
           placeholder="your@email.com"
@@ -76,11 +76,11 @@ function NewsletterForm() {
           onChange={(e) => setEmail(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleJoin()}
           style={{
-            flex: 1,
+            flex: "1 1 160px",
             background: "rgba(255,255,255,0.06)",
             border: "1px solid rgba(255,255,255,0.12)",
             borderRadius: 8,
-            padding: "10px 14px",
+            padding: "12px 14px",
             fontFamily: "var(--font-mono)",
             fontSize: 12,
             color: "#fff",
@@ -210,14 +210,14 @@ export default function Footer() {
             style={{
               display: "grid",
               gridTemplateColumns: isMobile
-                ? "repeat(2, 1fr)"
+                ? "1fr"
                 : "1.6fr 1fr 1.4fr",
-              gap: isMobile ? 40 : 56,
-              marginBottom: 56,
+              gap: isMobile ? 32 : 56,
+              marginBottom: 48,
             }}
           >
             {/* ── Col 1: Brand ── */}
-            <div style={isMobile ? { gridColumn: "1 / -1" } : {}}>
+            <div>
               {/* Logo */}
               <div
                 style={{
@@ -320,7 +320,7 @@ export default function Footer() {
             </div>
 
             {/* ── Col 3: Contact + Newsletter ── */}
-            <div style={isMobile ? { gridColumn: "1 / -1" } : {}}>
+            <div>
               <h4 style={{
                 fontFamily: "var(--font-barlow)",
                 fontWeight: 700,
@@ -391,10 +391,12 @@ export default function Footer() {
             style={{
               padding: isMobile ? "20px 0" : "24px 0",
               display: "flex",
-              justifyContent: "space-between",
+              justifyContent: isMobile ? "center" : "space-between",
               alignItems: "center",
+              flexDirection: isMobile ? "column" : "row",
               flexWrap: "wrap",
-              gap: 12,
+              gap: isMobile ? 8 : 12,
+              textAlign: isMobile ? "center" : "left",
             }}
           >
             <p style={{

@@ -338,16 +338,36 @@ h1, h2, h3 {
 @media (max-width: 640px) {
   html { font-size: 14px; }
 
-  .btn-teal, .btn-ghost {
+  .btn-teal, .btn-ghost, .btn-primary {
     min-height: 44px;
     padding: 12px 20px;
     font-size: 13px;
+    width: 100%;
   }
 
   .glass {
     border-radius: 12px;
   }
+
+  /* Ensure modals respect notch safe areas */
+  .modal-safe {
+    padding-top: max(20px, env(safe-area-inset-top));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
 }
+
+/* ── Safe area utilities ──────────────────────────────────────────── */
+.pb-safe { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+.pt-safe { padding-top: max(16px, env(safe-area-inset-top)); }
+
+/* ── Touch targets ───────────────────────────────────────────────── */
+button, [role="button"], a {
+  min-height: 44px;
+}
+/* Exceptions: decorative elements */
+.no-min-h { min-height: unset !important; }
 
 /* ── Scrollbar hide utility ───────────────────────────────────────── */
 .no-scrollbar::-webkit-scrollbar { display: none; }

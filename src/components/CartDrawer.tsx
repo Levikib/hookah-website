@@ -192,8 +192,8 @@ export default function CartDrawer() {
                           : updateQuantity(item.id, item.quantity - 1)
                       }
                       style={{
-                        width: 36,
-                        height: 36,
+                        width: 44,
+                        height: 44,
                         borderRadius: "50%",
                         border: "none",
                         background: "rgba(255,255,255,0.1)",
@@ -203,6 +203,7 @@ export default function CartDrawer() {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        flexShrink: 0,
                       }}
                     >
                       −
@@ -221,8 +222,8 @@ export default function CartDrawer() {
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
                       style={{
-                        width: 36,
-                        height: 36,
+                        width: 44,
+                        height: 44,
                         borderRadius: "50%",
                         border: "none",
                         background: "rgba(255,255,255,0.1)",
@@ -232,6 +233,7 @@ export default function CartDrawer() {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        flexShrink: 0,
                       }}
                     >
                       +
