@@ -6,1017 +6,949 @@ import type { RentalModel } from "@/data/rentals";
 import { useStore } from "@/store/useStore";
 import { useIsMobile } from "@/context/MobileContext";
 import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
-// ─── Tier → accent mapping (fallback to model's own accentColor) ─────────────
-const TIER_LABEL: Record<string, string> = {
-  Standard: "STANDARD",
-  Premium: "PREMIUM",
-  Luxury: "LUXURY",
-  Event: "EVENT",
-};
+gsap.registerPlugin(ScrollTrigger);
 
-// ─── Pedestal depth layout (translateZ, translateX per model index 0-5) ───────
-// Closest → furthest: index 0 is front-centre, spreading out
-const PEDESTAL_POSITIONS: { tz: number; tx: number; scale: number }[] = [
-  { tz: 160,  tx: -560, scale: 1.18 }, // front-left
-  { tz: 60,   tx: -200, scale: 1.06 }, // mid-left
-  { tz: -80,  tx: 120,  scale: 0.94 }, // back-left-centre
-  { tz: -80,  tx: -120, scale: 0.94 }, // back-right-centre
-  { tz: 60,   tx: 200,  scale: 1.06 }, // mid-right
-  { tz: 160,  tx: 560,  scale: 1.18 }, // front-right
-];
+function kes(n: number) {
+  return `KES ${n.toLocaleString("en-KE")}`;
+}
 
-// ─── Detailed hookah SVG ──────────────────────────────────────────────────────
-function HookahSVG({ color, height = 200 }: { color: string; height?: number }) {
-  const w = height * 0.45;
+// ─── Animated Hookah Illustrations ───────────────────────────────────────────
+// Each model gets a unique hand-crafted animated SVG — no two alike.
+
+function HookahClassic({ color, active }: { color: string; active: boolean }) {
   return (
-    <svg
-      viewBox="0 0 90 200"
-      width={w}
-      height={height}
-      fill="none"
-      aria-hidden="true"
-      style={{ display: "block", filter: `drop-shadow(0 0 12px ${color}88)` }}
-    >
-      {/* Coal tray rim */}
-      <ellipse cx="45" cy="12" rx="20" ry="6" fill={color} opacity="0.55" />
-      {/* Bowl */}
-      <path d="M30 12 Q28 26 33 32 Q45 36 57 32 Q62 26 60 12 Z" fill={color} opacity="0.75" />
+    <svg viewBox="0 0 120 280" fill="none" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+      <style>{`
+        @keyframes hc-smoke1{0%{transform:translate(0,0)scaleX(1);opacity:.7}100%{transform:translate(-8px,-50px)scaleX(1.8);opacity:0}}
+        @keyframes hc-smoke2{0%{transform:translate(0,0)scaleX(1);opacity:.5}100%{transform:translate(10px,-60px)scaleX(2);opacity:0}}
+        @keyframes hc-coal{0%,100%{opacity:.7}50%{opacity:1}}
+        @keyframes hc-shine{0%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+        .hc-s1{animation:hc-smoke1 2.8s ease-in infinite${active ? "" : ";animation-play-state:paused"}}
+        .hc-s2{animation:hc-smoke2 3.4s ease-in infinite .9s${active ? "" : ";animation-play-state:paused"}}
+        .hc-coal{animation:hc-coal 1.2s ease-in-out infinite${active ? "" : ";animation-play-state:paused"}}
+        .hc-shine{animation:hc-shine 3s ease-in-out infinite${active ? "" : ";animation-play-state:paused"}}
+      `}</style>
+      {/* Smoke */}
+      <g transform="translate(60,28)">
+        <ellipse className="hc-s1" cx="0" cy="0" rx="5" ry="9" fill={`${color}88`}/>
+        <ellipse className="hc-s2" cx="2" cy="-5" rx="7" ry="12" fill={`${color}55`}/>
+      </g>
+      {/* Coal glow */}
+      <ellipse className="hc-coal" cx="60" cy="32" rx="18" ry="6" fill={color} opacity=".9"/>
+      <ellipse cx="60" cy="31" rx="11" ry="4" fill="white" opacity=".3"/>
+      {/* Bowl — wide, classic shape */}
+      <path d="M36 32 Q32 52 38 62 Q48 70 60 71 Q72 70 82 62 Q88 52 84 32Z" fill={color} opacity=".85"/>
+      <path d="M44 36 Q40 52 44 60 Q50 66 58 67" stroke="white" strokeWidth="1.5" fill="none" opacity=".2"/>
       {/* Bowl neck */}
-      <rect x="41" y="32" width="8" height="10" rx="3" fill={color} opacity="0.6" />
-      {/* Tray plate */}
-      <ellipse cx="45" cy="44" rx="22" ry="7" fill={color} opacity="0.45" />
-      <ellipse cx="45" cy="44" rx="16" ry="5" fill={color} opacity="0.3" />
-      {/* Main shaft — tapered */}
-      <path d="M41 44 L43 130 L47 130 L49 44 Z" fill={color} opacity="0.55" rx="3" />
-      {/* Shaft ornament ring 1 */}
-      <ellipse cx="45" cy="80" rx="7" ry="3" fill={color} opacity="0.7" />
-      {/* Shaft ornament ring 2 */}
-      <ellipse cx="45" cy="108" rx="6" ry="2.5" fill={color} opacity="0.65" />
-      {/* Vase body */}
-      <path
-        d="M28 130 Q20 148 26 162 Q35 174 45 175 Q55 174 64 162 Q70 148 62 130 Z"
-        fill={color}
-        opacity="0.6"
-      />
-      {/* Vase highlight */}
-      <path
-        d="M33 135 Q28 148 32 160 Q36 166 40 168"
-        stroke="rgba(255,255,255,0.25)"
-        strokeWidth="2"
-        strokeLinecap="round"
-        fill="none"
-      />
-      {/* Base foot */}
-      <ellipse cx="45" cy="175" rx="26" ry="9" fill={color} opacity="0.65" />
-      <ellipse cx="45" cy="178" rx="18" ry="6" fill={color} opacity="0.4" />
+      <rect x="55" y="71" width="10" height="14" rx="4" fill={color} opacity=".75"/>
+      {/* Tray */}
+      <ellipse cx="60" cy="87" rx="28" ry="9" fill={color} opacity=".6"/>
+      <ellipse cx="60" cy="87" rx="20" ry="6" fill={color} opacity=".35"/>
+      {/* Shaft — ornate brass */}
+      <rect x="57" y="96" width="6" height="100" rx="3" fill={color} opacity=".7"/>
+      {/* Rings */}
+      <ellipse cx="60" cy="118" rx="10" ry="4" fill={color} opacity=".9"/>
+      <ellipse cx="60" cy="118" rx="7" ry="2.5" fill="white" opacity=".15"/>
+      <ellipse cx="60" cy="148" rx="9" ry="3.5" fill={color} opacity=".85"/>
+      <ellipse cx="60" cy="175" rx="8" ry="3" fill={color} opacity=".8"/>
+      {/* Vase — teardrop */}
+      <path d="M36 196 Q28 218 34 238 Q42 258 60 261 Q78 258 86 238 Q92 218 84 196Z" fill={color} opacity=".8"/>
+      <path d="M42 200 Q36 220 40 238 Q44 250 52 256" stroke="white" strokeWidth="2" fill="none" opacity=".18"/>
+      {/* Water shimmer in vase */}
+      <ellipse className="hc-shine" cx="60" cy="228" rx="18" ry="5" fill="white" opacity=".07"/>
+      {/* Base */}
+      <ellipse cx="60" cy="262" rx="32" ry="10" fill={color} opacity=".75"/>
+      <ellipse cx="60" cy="266" rx="22" ry="7" fill={color} opacity=".5"/>
       {/* Hose port */}
-      <circle cx="62" cy="145" r="4" fill={color} opacity="0.8" />
-      {/* Hose tube */}
-      <path
-        d="M66 145 Q84 140 86 158 Q88 174 76 178 Q68 182 65 176"
-        stroke={color}
-        strokeWidth="4.5"
-        strokeLinecap="round"
-        fill="none"
-        opacity="0.55"
-      />
-      {/* Mouthpiece */}
-      <ellipse cx="65" cy="176" rx="5" ry="3.5" fill={color} opacity="0.75" />
-      {/* Inner smoke glow */}
-      <ellipse cx="45" cy="150" rx="14" ry="18" fill={color} opacity="0.06" />
+      <circle cx="82" cy="220" r="5.5" fill={color} opacity=".9"/>
+      {/* Hose */}
+      <path d="M87 220 Q110 212 114 232 Q118 252 100 258 Q88 263 85 256" stroke={color} strokeWidth="6" strokeLinecap="round" fill="none" opacity=".65"/>
+      <ellipse cx="85" cy="256" rx="6" ry="4" fill={color} opacity=".85"/>
     </svg>
   );
 }
 
-// ─── Spotlight cone (light from ceiling) ─────────────────────────────────────
-function Spotlight({ color, brightness }: { color: string; brightness: number }) {
+function HookahPhantom({ color, active }: { color: string; active: boolean }) {
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: -220,
-        left: "50%",
-        transform: "translateX(-50%)",
-        width: 160,
-        height: 340,
-        background: `linear-gradient(to bottom, ${color}${Math.round(brightness * 255).toString(16).padStart(2, "0")}, transparent 80%)`,
-        clipPath: "polygon(35% 0%, 65% 0%, 85% 100%, 15% 100%)",
-        pointerEvents: "none",
-        transition: "opacity 0.4s ease",
-      }}
-      aria-hidden="true"
-    />
+    <svg viewBox="0 0 120 280" fill="none" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+      <style>{`
+        @keyframes hp-sm{0%{transform:translate(0,0);opacity:.6}100%{transform:translate(5px,-55px);opacity:0}}
+        @keyframes hp-pulse{0%,100%{opacity:.5}50%{opacity:.9}}
+        @keyframes hp-hose{0%,100%{transform:rotate(0deg)}50%{transform:rotate(1.5deg)}}
+        .hp-s1{animation:hp-sm 3s ease-in infinite${active?"":";animation-play-state:paused"}}
+        .hp-s2{animation:hp-sm 3.6s ease-in infinite 1.1s${active?"":";animation-play-state:paused"}}
+        .hp-p{animation:hp-pulse 2s ease-in-out infinite${active?"":";animation-play-state:paused"}}
+        .hp-h{animation:hp-hose 4s ease-in-out infinite${active?"":";animation-play-state:paused"};transform-origin:82px 225px}
+      `}</style>
+      {/* Smoke — thin, mysterious */}
+      <g transform="translate(60,26)">
+        <ellipse className="hp-s1" cx="0" cy="0" rx="3" ry="7" fill={`${color}99`}/>
+        <ellipse className="hp-s2" cx="3" cy="-4" rx="4" ry="9" fill={`${color}66`}/>
+      </g>
+      {/* Coal — ember glow */}
+      <ellipse className="hp-p" cx="60" cy="30" rx="14" ry="5" fill={color} opacity=".8"/>
+      <ellipse cx="60" cy="30" rx="7" ry="2.5" fill="#ff4444" opacity=".6"/>
+      {/* Bowl — angular, modern */}
+      <path d="M40 30 L38 58 L48 66 L60 68 L72 66 L82 58 L80 30Z" fill="#1a1a2e" stroke={color} strokeWidth="1.5" opacity=".95"/>
+      <path d="M46 35 L44 56 L50 62" stroke={color} strokeWidth=".8" fill="none" opacity=".4"/>
+      {/* Collar */}
+      <rect x="53" y="68" width="14" height="10" rx="2" fill={color} opacity=".8"/>
+      {/* Tray — angular */}
+      <path d="M35 80 L85 80 L90 90 L30 90Z" fill="#111122" stroke={color} strokeWidth="1" opacity=".9"/>
+      {/* Shaft — dead straight, matte black */}
+      <rect x="57.5" y="90" width="5" height="115" fill="#111122" stroke={color} strokeWidth=".8" opacity=".95"/>
+      {/* Accent bands */}
+      {[115, 145, 170].map((y, i) => (
+        <rect key={i} x="54" y={y} width="12" height="4" rx="2" fill={color} opacity=".7"/>
+      ))}
+      {/* Vase — cylindrical, architectural */}
+      <rect x="34" y="206" width="52" height="56" rx="8" fill="#111122" stroke={color} strokeWidth="1.5" opacity=".95"/>
+      <rect x="38" y="210" width="44" height="48" rx="6" fill="#0a0a18" opacity=".8"/>
+      {/* Vertical lines on vase */}
+      {[44,52,60,68,76].map((x,i) => (
+        <line key={i} x1={x} y1="214" x2={x} y2="254" stroke={color} strokeWidth=".5" opacity=".25"/>
+      ))}
+      {/* Base */}
+      <rect x="28" y="260" width="64" height="12" rx="4" fill={color} opacity=".7"/>
+      <rect x="32" y="264" width="56" height="6" rx="3" fill="#111122" opacity=".8"/>
+      {/* Hose */}
+      <g className="hp-h">
+        <path d="M86 225 Q112 218 116 240 Q118 258 102 262 Q90 265 87 258" stroke={color} strokeWidth="5.5" strokeLinecap="round" fill="none" opacity=".7"/>
+        <ellipse cx="87" cy="258" rx="5.5" ry="3.5" fill={color} opacity=".9"/>
+      </g>
+      <circle cx="83" cy="225" r="5" fill={color} opacity=".9"/>
+    </svg>
   );
 }
 
-// ─── Single Pedestal + Hookah unit ───────────────────────────────────────────
-function PedestalUnit({
+function HookahSultan({ color, active }: { color: string; active: boolean }) {
+  return (
+    <svg viewBox="0 0 120 280" fill="none" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+      <style>{`
+        @keyframes hs-sm{0%{transform:translate(0,0)scaleX(1);opacity:.8}100%{transform:translate(-6px,-65px)scaleX(2.2);opacity:0}}
+        @keyframes hs-sm2{0%{transform:translate(0,0);opacity:.6}100%{transform:translate(10px,-70px);opacity:0}}
+        @keyframes hs-glow{0%,100%{opacity:.6;filter:blur(2px)}50%{opacity:1;filter:blur(4px)}}
+        @keyframes hs-orbit{0%{transform:rotate(0deg)translateX(22px)}100%{transform:rotate(360deg)translateX(22px)}}
+        @keyframes hs-shine{0%,100%{opacity:.08}50%{opacity:.18}}
+        .hs-s1{animation:hs-sm 2.6s ease-in infinite${active?"":";animation-play-state:paused"}}
+        .hs-s2{animation:hs-sm2 3.2s ease-in infinite .8s${active?"":";animation-play-state:paused"}}
+        .hs-s3{animation:hs-sm 3.8s ease-in infinite 1.6s${active?"":";animation-play-state:paused"}}
+        .hs-gl{animation:hs-glow 2s ease-in-out infinite${active?"":";animation-play-state:paused"}}
+        .hs-orb{animation:hs-orbit 4s linear infinite;transform-origin:60px 30px;${active?"":"animation-play-state:paused"}}
+        .hs-sh{animation:hs-shine 3s ease-in-out infinite${active?"":";animation-play-state:paused"}}
+      `}</style>
+      {/* Orbiting gem */}
+      <circle className="hs-orb" cx="60" cy="30" r="3.5" fill="#fff" opacity=".9"/>
+      {/* Smoke — rich, plentiful */}
+      <g transform="translate(60,22)">
+        <ellipse className="hs-s1" cx="-3" cy="0" rx="6" ry="10" fill={`${color}99`}/>
+        <ellipse className="hs-s2" cx="4" cy="-4" rx="8" ry="13" fill={`${color}66`}/>
+        <ellipse className="hs-s3" cx="-1" cy="-2" rx="5" ry="8" fill={`${color}77`}/>
+      </g>
+      {/* Coal — blazing */}
+      <ellipse className="hs-gl" cx="60" cy="28" rx="20" ry="7" fill={color}/>
+      <ellipse cx="60" cy="27" rx="13" ry="4.5" fill="white" opacity=".5"/>
+      {/* Crown-shaped bowl */}
+      <path d="M34 28 L36 16 L44 24 L52 12 L60 22 L68 12 L76 24 L84 16 L86 28Z" fill={color} opacity=".95"/>
+      <path d="M34 28 Q30 50 36 62 Q46 74 60 75 Q74 74 84 62 Q90 50 86 28Z" fill={color} opacity=".88"/>
+      {/* Gold filigree on bowl */}
+      <path d="M40 40 Q44 36 48 40 Q44 44 40 40" stroke="white" strokeWidth=".8" fill="none" opacity=".35"/>
+      <path d="M72 40 Q76 36 80 40 Q76 44 72 40" stroke="white" strokeWidth=".8" fill="none" opacity=".35"/>
+      <path d="M56 42 Q60 38 64 42 Q60 46 56 42" stroke="white" strokeWidth=".8" fill="none" opacity=".35"/>
+      {/* Neck + ornate collar */}
+      <rect x="55" y="75" width="10" height="12" rx="4" fill={color} opacity=".8"/>
+      {/* Tray — ornate with gems */}
+      <ellipse cx="60" cy="90" rx="30" ry="9.5" fill={color} opacity=".75"/>
+      <ellipse cx="60" cy="89" rx="22" ry="6.5" fill={color} opacity=".5"/>
+      {/* Gem dots on tray */}
+      {[30,46,60,74,90].map((x,i) => (
+        <circle key={i} cx={x} cy="89" r="2" fill="white" opacity=".4"/>
+      ))}
+      {/* Shaft — ornate gold */}
+      <rect x="57" y="100" width="6" height="106" rx="3" fill={color} opacity=".8"/>
+      {/* Elaborate rings */}
+      {[120, 148, 170, 192].map((y, i) => (
+        <g key={i}>
+          <ellipse cx="60" cy={y} rx={11-i} ry={4-i*0.3} fill={color} opacity=".9"/>
+          <ellipse cx="60" cy={y} rx={7-i} ry={2.5-i*0.2} fill="white" opacity=".2"/>
+        </g>
+      ))}
+      {/* Vase — opulent urn shape */}
+      <path d="M32 206 Q22 228 28 248 Q36 268 60 271 Q84 268 92 248 Q98 228 88 206Z" fill={color} opacity=".85"/>
+      <path d="M38 210 Q30 230 34 248 Q40 260 52 265" stroke="white" strokeWidth="2" fill="none" opacity=".2"/>
+      {/* Water shimmer */}
+      <ellipse className="hs-sh" cx="60" cy="238" rx="22" ry="6" fill="white"/>
+      {/* Gem band around vase equator */}
+      <ellipse cx="60" cy="238" rx="29" ry="5" fill="none" stroke={color} strokeWidth="1.5" opacity=".6"/>
+      {[0,60,120,180,240,300].map((a,i) => {
+        const rad = a*Math.PI/180;
+        return <circle key={i} cx={60+29*Math.cos(rad)} cy={238+5*Math.sin(rad)} r="2.5" fill="white" opacity=".5"/>;
+      })}
+      {/* Base — elaborate */}
+      <ellipse cx="60" cy="272" rx="36" ry="11" fill={color} opacity=".8"/>
+      <ellipse cx="60" cy="275" rx="28" ry="8" fill={color} opacity=".55"/>
+      <ellipse cx="60" cy="278" rx="18" ry="5" fill={color} opacity=".4"/>
+      {/* Dual hoses */}
+      <circle cx="88" cy="225" r="5.5" fill={color} opacity=".9"/>
+      <path d="M93 225 Q116 216 118 238 Q120 258 104 262 Q92 266 89 258" stroke={color} strokeWidth="6" strokeLinecap="round" fill="none" opacity=".7"/>
+      <ellipse cx="89" cy="258" rx="6" ry="4" fill={color} opacity=".9"/>
+      <circle cx="32" cy="225" r="5.5" fill={color} opacity=".9"/>
+      <path d="M27 225 Q4 216 2 238 Q0 258 16 262 Q28 266 31 258" stroke={color} strokeWidth="6" strokeLinecap="round" fill="none" opacity=".7"/>
+      <ellipse cx="31" cy="258" rx="6" ry="4" fill={color} opacity=".9"/>
+    </svg>
+  );
+}
+
+function HookahStreetKing({ color, active }: { color: string; active: boolean }) {
+  return (
+    <svg viewBox="0 0 120 280" fill="none" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+      <style>{`
+        @keyframes sk-sm{0%{transform:translate(0,0);opacity:.65}100%{transform:translate(-4px,-45px);opacity:0}}
+        @keyframes sk-coal{0%,100%{opacity:.6}50%{opacity:1}}
+        @keyframes sk-tag{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+        .sk-s1{animation:sk-sm 2.5s ease-in infinite${active?"":";animation-play-state:paused"}}
+        .sk-s2{animation:sk-sm 3s ease-in infinite .7s${active?"":";animation-play-state:paused"}}
+        .sk-coal{animation:sk-coal 1s ease-in-out infinite${active?"":";animation-play-state:paused"}}
+        .sk-tag{animation:sk-tag 3s ease-in-out infinite;transform-origin:100px 180px;${active?"":"animation-play-state:paused"}}
+      `}</style>
+      {/* Smoke */}
+      <g transform="translate(60,36)">
+        <ellipse className="sk-s1" cx="0" cy="0" rx="4" ry="7" fill={`${color}99`}/>
+        <ellipse className="sk-s2" cx="3" cy="-4" rx="5" ry="9" fill={`${color}66`}/>
+      </g>
+      {/* Coal */}
+      <ellipse className="sk-coal" cx="60" cy="40" rx="15" ry="5" fill={color} opacity=".85"/>
+      {/* Bowl — squat, urban */}
+      <path d="M40 40 Q38 56 42 64 Q50 72 60 73 Q70 72 78 64 Q82 56 80 40Z" fill={color} opacity=".88"/>
+      {/* Spray paint drip detail */}
+      <path d="M44 52 Q42 60 44 66" stroke="white" strokeWidth="1.2" fill="none" opacity=".25"/>
+      {/* Neck */}
+      <rect x="56" y="73" width="8" height="10" rx="3" fill={color} opacity=".75"/>
+      {/* Tray — flat industrial */}
+      <rect x="38" y="84" width="44" height="10" rx="3" fill={color} opacity=".7"/>
+      <rect x="42" y="86" width="36" height="6" rx="2" fill="rgba(0,0,0,.4)"/>
+      {/* Shaft — shorter, chunky */}
+      <rect x="56.5" y="94" width="7" height="88" rx="3.5" fill={color} opacity=".75"/>
+      {/* Bands */}
+      <rect x="53" y="112" width="14" height="5" rx="2.5" fill={color} opacity=".9"/>
+      <rect x="53" y="148" width="14" height="5" rx="2.5" fill={color} opacity=".9"/>
+      {/* Vase — short, wide cylinder */}
+      <rect x="32" y="184" width="56" height="68" rx="12" fill={color} opacity=".82"/>
+      <rect x="36" y="188" width="48" height="60" rx="9" fill="rgba(0,0,0,.55)"/>
+      {/* Urban texture lines */}
+      {[198, 214, 230, 244].map((y,i) => (
+        <line key={i} x1="36" y1={y} x2="84" y2={y} stroke={color} strokeWidth=".6" opacity=".2"/>
+      ))}
+      {/* Tag/label swinging */}
+      <g className="sk-tag">
+        <rect x="90" y="175" width="22" height="14" rx="3" fill="rgba(0,0,0,.8)" stroke={color} strokeWidth="1"/>
+        <line x1="88" y1="183" x2="84" y2="200" stroke={color} strokeWidth=".8" opacity=".5"/>
+        <text x="101" y="185" textAnchor="middle" fontSize="5" fill={color} fontFamily="monospace">SK</text>
+        <text x="101" y="184" textAnchor="middle" fontSize="5" fill={color} fontFamily="monospace" opacity=".6">01</text>
+      </g>
+      {/* Base */}
+      <rect x="26" y="250" width="68" height="14" rx="5" fill={color} opacity=".7"/>
+      {/* Hose — thick rubber */}
+      <circle cx="84" cy="216" r="5" fill={color} opacity=".9"/>
+      <path d="M89 216 Q112 208 114 228 Q116 246 100 252 Q89 256 87 249" stroke={color} strokeWidth="7" strokeLinecap="round" fill="none" opacity=".7"/>
+      <ellipse cx="87" cy="249" rx="6" ry="4" fill={color} opacity=".9"/>
+    </svg>
+  );
+}
+
+function HookahCrystal({ color, active }: { color: string; active: boolean }) {
+  return (
+    <svg viewBox="0 0 120 280" fill="none" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+      <style>{`
+        @keyframes cr-sm{0%{transform:translate(0,0);opacity:.7}100%{transform:translate(-5px,-60px);opacity:0}}
+        @keyframes cr-refract{0%,100%{opacity:.08}50%{opacity:.22}}
+        @keyframes cr-bubble{0%{transform:translateY(0)}100%{transform:translateY(-80px);opacity:0}}
+        @keyframes cr-glow{0%,100%{opacity:.4}50%{opacity:.9}}
+        .cr-s1{animation:cr-sm 3s ease-in infinite${active?"":";animation-play-state:paused"}}
+        .cr-s2{animation:cr-sm 3.7s ease-in infinite 1s${active?"":";animation-play-state:paused"}}
+        .cr-ref{animation:cr-refract 2.5s ease-in-out infinite${active?"":";animation-play-state:paused"}}
+        .cr-b1{animation:cr-bubble 4s ease-in infinite${active?"":";animation-play-state:paused"}}
+        .cr-b2{animation:cr-bubble 4s ease-in infinite 1.3s${active?"":";animation-play-state:paused"}}
+        .cr-b3{animation:cr-bubble 4s ease-in infinite 2.6s${active?"":";animation-play-state:paused"}}
+        .cr-gl{animation:cr-glow 2s ease-in-out infinite${active?"":";animation-play-state:paused"}}
+      `}</style>
+      {/* Smoke */}
+      <g transform="translate(60,24)">
+        <ellipse className="cr-s1" cx="0" cy="0" rx="5" ry="9" fill={`${color}88`}/>
+        <ellipse className="cr-s2" cx="4" cy="-5" rx="7" ry="12" fill={`${color}55`}/>
+      </g>
+      {/* Coal glow */}
+      <ellipse className="cr-gl" cx="60" cy="28" rx="17" ry="6" fill={color}/>
+      <ellipse cx="60" cy="27" rx="10" ry="3.5" fill="white" opacity=".5"/>
+      {/* Bowl — faceted crystal */}
+      <path d="M38 28 L36 36 L40 50 L48 62 L60 65 L72 62 L80 50 L84 36 L82 28Z" fill={color} opacity=".3" stroke={color} strokeWidth="1.2"/>
+      <path d="M38 28 L46 24 L60 22 L74 24 L82 28" fill="none" stroke={color} strokeWidth="1" opacity=".6"/>
+      {/* Crystal facets */}
+      <line x1="60" y1="22" x2="40" y2="50" stroke="white" strokeWidth=".8" opacity=".2"/>
+      <line x1="60" y1="22" x2="80" y2="50" stroke="white" strokeWidth=".8" opacity=".2"/>
+      <line x1="60" y1="22" x2="60" y2="65" stroke="white" strokeWidth=".8" opacity=".15"/>
+      {/* Refraction highlight */}
+      <path className="cr-ref" d="M44 35 L50 28 L56 35Z" fill="white"/>
+      <path className="cr-ref" d="M68 42 L74 35 L80 42Z" fill="white"/>
+      {/* Neck — crystal clear */}
+      <rect x="56" y="65" width="8" height="14" rx="3" fill={color} opacity=".5" stroke={color} strokeWidth="1"/>
+      {/* Tray */}
+      <ellipse cx="60" cy="81" rx="27" ry="8" fill={color} opacity=".5" stroke={color} strokeWidth="1"/>
+      {/* Shaft — fully transparent crystal, bubbles rising inside */}
+      <rect x="57" y="89" width="6" height="110" rx="3" fill={color} opacity=".15" stroke={color} strokeWidth="1"/>
+      {/* Bubbles rising through shaft */}
+      <circle className="cr-b1" cx="60" cy="190" r="2" fill={color} opacity=".6"/>
+      <circle className="cr-b2" cx="61" cy="195" r="1.5" fill={color} opacity=".4"/>
+      <circle className="cr-b3" cx="59" cy="185" r="1.8" fill={color} opacity=".5"/>
+      {/* Vase — pure crystal */}
+      <path d="M34 200 Q26 222 32 244 Q40 264 60 267 Q80 264 88 244 Q94 222 86 200Z" fill={color} opacity=".18" stroke={color} strokeWidth="1.5"/>
+      {/* Crystal planes in vase */}
+      <line x1="60" y1="200" x2="34" y2="244" stroke="white" strokeWidth=".8" opacity=".1"/>
+      <line x1="60" y1="200" x2="86" y2="244" stroke="white" strokeWidth=".8" opacity=".1"/>
+      <line x1="34" y1="244" x2="86" y2="244" stroke="white" strokeWidth=".8" opacity=".1"/>
+      {/* Water level */}
+      <ellipse cx="60" cy="238" rx="22" ry="5" fill={color} opacity=".25" stroke={color} strokeWidth=".8"/>
+      {/* Base */}
+      <ellipse cx="60" cy="268" rx="30" ry="9" fill={color} opacity=".6" stroke={color} strokeWidth="1"/>
+      <ellipse cx="60" cy="272" rx="20" ry="6" fill={color} opacity=".3"/>
+      {/* Hose */}
+      <circle cx="85" cy="224" r="5" fill={color} opacity=".8" stroke={color} strokeWidth="1"/>
+      <path d="M90 224 Q113 216 115 238 Q117 256 101 260 Q90 264 87 257" stroke={color} strokeWidth="5.5" strokeLinecap="round" fill="none" opacity=".6"/>
+      <ellipse cx="87" cy="257" rx="5.5" ry="3.5" fill={color} opacity=".8"/>
+    </svg>
+  );
+}
+
+function HookahColossus({ color, active }: { color: string; active: boolean }) {
+  return (
+    <svg viewBox="0 0 140 280" fill="none" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+      <style>{`
+        @keyframes col-sm{0%{transform:translate(0,0)scaleX(1);opacity:.7}100%{transform:translate(var(--dx),-55px)scaleX(1.8);opacity:0}}
+        @keyframes col-fire{0%,100%{transform:scaleY(1)skewX(-2deg)}50%{transform:scaleY(1.15)skewX(3deg)}}
+        @keyframes col-pulse{0%,100%{opacity:.5}50%{opacity:1}}
+        @keyframes col-hose{0%,100%{transform:rotate(0deg)}50%{transform:rotate(1deg)}}
+        .col-s1{--dx:-10px;animation:col-sm 2.8s ease-in infinite${active?"":";animation-play-state:paused"}}
+        .col-s2{--dx:8px;animation:col-sm 3.3s ease-in infinite .6s${active?"":";animation-play-state:paused"}}
+        .col-s3{--dx:-4px;animation:col-sm 3.8s ease-in infinite 1.2s${active?"":";animation-play-state:paused"}}
+        .col-s4{--dx:12px;animation:col-sm 3s ease-in infinite 1.8s${active?"":";animation-play-state:paused"}}
+        .col-fi{animation:col-fire 1.3s ease-in-out infinite;transform-origin:70px 20px;${active?"":"animation-play-state:paused"}}
+        .col-p{animation:col-pulse 1.5s ease-in-out infinite${active?"":";animation-play-state:paused"}}
+        .col-h1{animation:col-hose 3.5s ease-in-out infinite;transform-origin:112px 215px;${active?"":"animation-play-state:paused"}}
+        .col-h2{animation:col-hose 4s ease-in-out infinite .5s;transform-origin:28px 215px;${active?"":"animation-play-state:paused"}}
+        .col-h3{animation:col-hose 3.2s ease-in-out infinite 1s;transform-origin:118px 230px;${active?"":"animation-play-state:paused"}}
+        .col-h4{animation:col-hose 4.5s ease-in-out infinite 1.5s;transform-origin:22px 230px;${active?"":"animation-play-state:paused"}}
+      `}</style>
+      {/* Smoke — 4 plumes */}
+      <g transform="translate(70,18)">
+        <ellipse className="col-s1" cx="-12" cy="0" rx="5" ry="9" fill={`${color}88`}/>
+        <ellipse className="col-s2" cx="12" cy="-2" rx="6" ry="11" fill={`${color}77`}/>
+        <ellipse className="col-s3" cx="-4" cy="-4" rx="4" ry="8" fill={`${color}66`}/>
+        <ellipse className="col-s4" cx="4" cy="-1" rx="5" ry="9" fill={`${color}55`}/>
+      </g>
+      {/* Fire on coal */}
+      <g className="col-fi">
+        <path d="M52 18 Q70 4 88 18 Q82 10 70 8 Q58 10 52 18Z" fill="#f59e0b" opacity=".9"/>
+      </g>
+      {/* Coal — massive, blazing */}
+      <ellipse className="col-p" cx="70" cy="22" rx="28" ry="9" fill={color}/>
+      <ellipse cx="70" cy="21" rx="18" ry="5.5" fill="white" opacity=".35"/>
+      {/* Bowl — huge, dominating */}
+      <path d="M36 22 Q30 46 36 62 Q46 80 70 82 Q94 80 104 62 Q110 46 104 22Z" fill={color} opacity=".88"/>
+      <path d="M44 28 Q38 48 42 62 Q48 72 58 77" stroke="white" strokeWidth="2" fill="none" opacity=".18"/>
+      {/* Neck */}
+      <rect x="65" y="82" width="10" height="14" rx="4" fill={color} opacity=".8"/>
+      {/* Tray — grand */}
+      <ellipse cx="70" cy="99" rx="36" ry="11" fill={color} opacity=".75"/>
+      <ellipse cx="70" cy="98" rx="26" ry="7.5" fill={color} opacity=".45"/>
+      {/* Shaft — thick, powerful */}
+      <rect x="66.5" y="110" width="7" height="100" rx="3.5" fill={color} opacity=".8"/>
+      {/* Power rings */}
+      {[128, 158, 186].map((y,i) => (
+        <g key={i}>
+          <ellipse cx="70" cy={y} rx={14-i*2} ry={5-i} fill={color} opacity=".9"/>
+          <ellipse cx="70" cy={y} rx={9-i} ry={3-i*0.5} fill="white" opacity=".18"/>
+        </g>
+      ))}
+      {/* Vase — colossal urn */}
+      <path d="M30 212 Q18 238 26 260 Q38 282 70 285 Q102 282 114 260 Q122 238 110 212Z" fill={color} opacity=".85"/>
+      <path d="M38 216 Q28 240 34 258 Q42 272 56 278" stroke="white" strokeWidth="2.5" fill="none" opacity=".17"/>
+      {/* Base — heavy plinth */}
+      <rect x="20" y="272" width="100" height="8" rx="4" fill={color} opacity=".7"/>
+      <rect x="14" y="278" width="112" height="6" rx="3" fill={color} opacity=".55"/>
+      {/* 4 hose ports */}
+      <circle cx="108" cy="215" r="6" fill={color} opacity=".9"/>
+      <circle cx="32" cy="215" r="6" fill={color} opacity=".9"/>
+      <circle cx="112" cy="235" r="5.5" fill={color} opacity=".85"/>
+      <circle cx="28" cy="235" r="5.5" fill={color} opacity=".85"/>
+      {/* 4 hoses */}
+      <g className="col-h1"><path d="M114 215 Q135 205 137 226 Q139 244 124 250" stroke={color} strokeWidth="5.5" strokeLinecap="round" fill="none" opacity=".65"/></g>
+      <g className="col-h2"><path d="M26 215 Q5 205 3 226 Q1 244 16 250" stroke={color} strokeWidth="5.5" strokeLinecap="round" fill="none" opacity=".65"/></g>
+      <g className="col-h3"><path d="M117 235 Q138 250 136 268 Q134 280 120 278" stroke={color} strokeWidth="5" strokeLinecap="round" fill="none" opacity=".6"/></g>
+      <g className="col-h4"><path d="M23 235 Q2 250 4 268 Q6 280 20 278" stroke={color} strokeWidth="5" strokeLinecap="round" fill="none" opacity=".6"/></g>
+    </svg>
+  );
+}
+
+const HOOKAH_COMPONENTS: Record<string, React.ComponentType<{ color: string; active: boolean }>> = {
+  classic:  HookahClassic,
+  phantom:  HookahPhantom,
+  sultan:   HookahSultan,
+  street:   HookahStreetKing,
+  crystal:  HookahCrystal,
+  colossus: HookahColossus,
+};
+
+const TIER_COLORS: Record<string, string> = {
+  Standard: "rgba(255,255,255,0.15)",
+  Premium:  "rgba(34,211,238,0.25)",
+  Luxury:   "rgba(245,158,11,0.35)",
+  Event:    "rgba(168,85,247,0.35)",
+};
+
+const TIER_TEXT: Record<string, string> = {
+  Standard: "rgba(255,255,255,0.6)",
+  Premium:  "#22d3ee",
+  Luxury:   "#f59e0b",
+  Event:    "#a855f7",
+};
+
+// ─── Model Card ───────────────────────────────────────────────────────────────
+
+function ModelCard({
   model,
-  index,
   isSelected,
-  isDeselected,
   onSelect,
-  pedestalRef,
+  isMobile,
 }: {
   model: RentalModel;
-  index: number;
   isSelected: boolean;
-  isDeselected: boolean;
   onSelect: () => void;
-  pedestalRef: (el: HTMLDivElement | null) => void;
+  isMobile: boolean;
 }) {
-  const pos = PEDESTAL_POSITIONS[index];
-  const [hovered, setHovered] = useState(false);
-  const hookahRef = useRef<HTMLDivElement>(null);
-  const idleRef = useRef<gsap.core.Tween | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const HookahComp = HOOKAH_COMPONENTS[model.id] ?? HookahClassic;
+  const pointerDown = useRef({ x: 0, y: 0 });
 
-  // Idle sway animation
-  useEffect(() => {
-    if (!hookahRef.current) return;
-    idleRef.current = gsap.to(hookahRef.current, {
-      rotationZ: -3,
-      duration: 4 + index * 0.7,
-      yoyo: true,
-      repeat: -1,
-      ease: "sine.inOut",
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    pointerDown.current = { x: e.clientX, y: e.clientY };
+  }, []);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    const dx = Math.abs(e.clientX - pointerDown.current.x);
+    const dy = Math.abs(e.clientY - pointerDown.current.y);
+    if (dx > 6 || dy > 6) return;
+    if (!cardRef.current) { onSelect(); return; }
+    gsap.to(cardRef.current, {
+      scale: 0.96, duration: 0.08,
+      onComplete: () => gsap.to(cardRef.current, { scale: 1, duration: 0.35, ease: "elastic.out(1.2, 0.5)", onComplete: onSelect }),
     });
-    return () => { idleRef.current?.kill(); };
-  }, [index]);
+  }, [onSelect]);
 
-  // Hover lift
-  useEffect(() => {
-    if (!hookahRef.current) return;
-    gsap.to(hookahRef.current, {
-      y: hovered && !isSelected ? -8 : 0,
-      duration: 0.3,
-      ease: "power2.out",
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!cardRef.current || isMobile) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    gsap.to(cardRef.current, {
+      rotateY: x * 14, rotateX: -y * 10,
+      transformPerspective: 900,
+      duration: 0.35, ease: "power2.out",
     });
-  }, [hovered, isSelected]);
+  }, [isMobile]);
 
-  const accent = model.accentColor;
-  const spotBrightness = isSelected ? 0.22 : hovered ? 0.14 : 0.08;
+  const handleMouseLeave = useCallback(() => {
+    if (!cardRef.current) return;
+    gsap.to(cardRef.current, { rotateY: 0, rotateX: 0, duration: 0.6, ease: "elastic.out(1, 0.5)" });
+  }, []);
 
   return (
     <div
-      ref={pedestalRef}
-      onClick={onSelect}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      ref={cardRef}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      data-rental-pedestal
       style={{
-        position: "absolute",
-        bottom: 0,
-        left: "50%",
-        transformOrigin: "bottom center",
-        transform: `translateX(-50%) translateX(${pos.tx}px) translateZ(${pos.tz}px) scale(${pos.scale})`,
-        opacity: isDeselected ? 0.28 : 1,
-        transition: "opacity 0.5s ease",
+        position: "relative",
+        borderRadius: 20,
+        overflow: "hidden",
+        background: isSelected
+          ? `linear-gradient(160deg, ${model.accentColor}18 0%, rgba(13,10,30,0.98) 50%)`
+          : "rgba(13,10,30,0.92)",
+        border: `1px solid ${isSelected ? model.accentColor + "66" : model.accentColor + "22"}`,
+        boxShadow: isSelected
+          ? `0 0 0 1px ${model.accentColor}44, 0 8px 60px ${model.accentColor}33, 0 4px 30px rgba(0,0,0,0.6)`
+          : "0 4px 24px rgba(0,0,0,0.5)",
         cursor: "pointer",
-        width: 160,
+        userSelect: "none",
+        willChange: "transform",
+        transformStyle: "preserve-3d",
+        transition: "box-shadow 0.35s ease, border-color 0.35s ease, background 0.35s ease",
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
       }}
-      aria-label={`Select ${model.name}`}
     >
-      {/* Ceiling spotlight */}
-      <Spotlight color={accent} brightness={spotBrightness} />
-
-      {/* Hookah visual */}
-      <div
-        ref={hookahRef}
-        style={{
-          marginBottom: 12,
-          transformOrigin: "bottom center",
-          transition: "filter 0.3s ease",
-          filter: isSelected
-            ? `drop-shadow(0 0 28px ${accent}) drop-shadow(0 -6px 16px ${accent}88)`
-            : `drop-shadow(0 0 8px ${accent}66)`,
-        }}
-      >
-        <HookahSVG color={accent} height={190} />
+      {/* Tier badge — top left */}
+      <div style={{
+        position: "absolute", top: 14, left: 14, zIndex: 2,
+        background: TIER_COLORS[model.tier],
+        border: `1px solid ${TIER_TEXT[model.tier]}44`,
+        borderRadius: 30,
+        padding: "4px 12px",
+        fontFamily: "var(--font-mono)",
+        fontSize: 8, letterSpacing: "0.2em",
+        color: TIER_TEXT[model.tier],
+        textTransform: "uppercase",
+        backdropFilter: "blur(4px)",
+      }}>
+        {model.tier}
       </div>
 
-      {/* Pedestal base — trapezoid cylinder illusion */}
-      <div
-        style={{
-          position: "relative",
-          width: 130,
-          height: 64,
-          clipPath: "polygon(10% 0%, 90% 0%, 100% 100%, 0% 100%)",
-          background: `linear-gradient(160deg, #1a1235 0%, #0d0a1e 60%, #05030a 100%)`,
-          border: "none",
-          boxShadow: isSelected
-            ? `0 0 0 2px ${accent}, 0 0 40px ${accent}66, inset 0 1px 0 rgba(255,255,255,0.08)`
-            : `0 0 0 1px ${accent}44, 0 0 16px ${accent}33, inset 0 1px 0 rgba(255,255,255,0.04)`,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 4,
-          transition: "box-shadow 0.4s ease",
-        }}
-      >
-        {/* Model name on pedestal face */}
-        <span
-          style={{
-            fontFamily: "var(--font-bebas)",
-            fontSize: 13,
-            letterSpacing: "0.1em",
-            color: isSelected ? accent : "rgba(255,255,255,0.75)",
-            textTransform: "uppercase",
-            lineHeight: 1,
-            textAlign: "center",
-            padding: "0 8px",
-            transition: "color 0.3s",
-          }}
-        >
-          {model.name}
-        </span>
-        {/* Tier badge */}
-        <span
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 8,
-            letterSpacing: "0.16em",
-            color: accent,
-            border: `1px solid ${accent}66`,
-            padding: "1px 6px",
-            borderRadius: 3,
-            lineHeight: 1.4,
-            textTransform: "uppercase",
-          }}
-        >
-          {TIER_LABEL[model.tier]}
-        </span>
-      </div>
+      {/* Selected indicator */}
+      {isSelected && (
+        <div style={{
+          position: "absolute", top: 14, right: 14, zIndex: 2,
+          width: 10, height: 10, borderRadius: "50%",
+          background: model.accentColor,
+          boxShadow: `0 0 12px ${model.accentColor}`,
+        }}/>
+      )}
 
-      {/* Floor glow puddle */}
-      <div
-        style={{
-          width: 120,
-          height: 16,
+      {/* Hookah illustration */}
+      <div style={{
+        height: isMobile ? 200 : 260,
+        display: "flex",
+        alignItems: "flex-end",
+        justifyContent: "center",
+        padding: "24px 20px 0",
+        position: "relative",
+        overflow: "visible",
+      }}>
+        {/* Floor glow */}
+        <div style={{
+          position: "absolute",
+          bottom: 0, left: "50%",
+          transform: "translateX(-50%)",
+          width: 120, height: 20,
           borderRadius: "50%",
-          background: `radial-gradient(ellipse, ${accent}44 0%, transparent 75%)`,
-          marginTop: -4,
-          transition: "opacity 0.4s ease",
-          opacity: isSelected ? 1 : 0.5,
-        }}
-        aria-hidden="true"
-      />
+          background: `radial-gradient(ellipse, ${model.accentColor}55 0%, transparent 70%)`,
+          filter: "blur(6px)",
+          transition: "opacity 0.4s",
+          opacity: isSelected ? 1 : 0.4,
+        }}/>
+        {/* Ceiling spotlight cone */}
+        <div style={{
+          position: "absolute",
+          top: 0, left: "50%",
+          transform: "translateX(-50%)",
+          width: 100, height: "80%",
+          background: `linear-gradient(to bottom, ${model.accentColor}${isSelected ? "30" : "14"}, transparent 90%)`,
+          clipPath: "polygon(30% 0%, 70% 0%, 80% 100%, 20% 100%)",
+          pointerEvents: "none",
+          transition: "opacity 0.4s",
+        }}/>
+        <div style={{
+          width: model.id === "colossus" ? "100%" : "75%",
+          maxWidth: model.id === "colossus" ? 140 : 90,
+          height: "100%",
+          filter: isSelected
+            ? `drop-shadow(0 0 18px ${model.accentColor}cc) drop-shadow(0 0 40px ${model.accentColor}66)`
+            : `drop-shadow(0 0 8px ${model.accentColor}55)`,
+          transition: "filter 0.4s ease",
+        }}>
+          <HookahComp color={model.accentColor} active={isSelected} />
+        </div>
+      </div>
+
+      {/* Card info */}
+      <div style={{ padding: "12px 20px 22px", flex: 1, display: "flex", flexDirection: "column" }}>
+        <h3 style={{
+          fontFamily: "var(--font-serif)",
+          fontSize: 26, fontWeight: 600, fontStyle: "italic",
+          color: "white", lineHeight: 1, marginBottom: 4,
+          letterSpacing: "-0.01em",
+        }}>
+          {model.name}
+        </h3>
+        <p style={{
+          fontFamily: "var(--font-serif)", fontStyle: "italic",
+          fontSize: 13, color: "rgba(255,255,255,0.42)",
+          lineHeight: 1.4, marginBottom: 14,
+        }}>
+          {model.tagline}
+        </p>
+
+        {/* Quick specs */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+          {[
+            { label: model.height },
+            { label: model.hoseType },
+          ].map(({ label }) => (
+            <span key={label} style={{
+              fontFamily: "var(--font-mono)", fontSize: 9,
+              letterSpacing: "0.12em", textTransform: "uppercase",
+              color: "rgba(255,255,255,0.4)",
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 4, padding: "3px 8px",
+            }}>
+              {label}
+            </span>
+          ))}
+        </div>
+
+        {/* Price + availability */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          paddingTop: 12,
+          borderTop: `1px solid ${model.accentColor}18`,
+          marginTop: "auto",
+        }}>
+          <div>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.15em", color: "rgba(255,255,255,0.25)", textTransform: "uppercase", marginBottom: 1 }}>per session</p>
+            <p style={{ fontFamily: "var(--font-serif)", fontSize: 22, fontWeight: 600, color: model.accentColor, lineHeight: 1 }}>
+              {kes(model.sessionRate)}
+            </p>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end",
+            }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: "50%",
+                background: model.available > 2 ? "#22d3ee" : model.available === 1 ? "#fbbf24" : "#6b5f88",
+                boxShadow: model.available > 0 ? `0 0 6px ${model.available > 2 ? "#22d3ee" : "#fbbf24"}` : "none",
+              }}/>
+              <span style={{
+                fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.1em",
+                color: model.available > 2 ? "#22d3ee" : model.available === 1 ? "#fbbf24" : "#6b7280",
+                textTransform: "uppercase",
+              }}>
+                {model.available > 2 ? "Available" : model.available === 1 ? "Last unit" : `${model.available} left`}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-// ─── Detail Panel (desktop: right sidebar, mobile: bottom sheet) ──────────────
-function DetailPanel({
-  model,
-  onClose,
-  isMobile,
-}: {
-  model: RentalModel;
-  onClose: () => void;
-  isMobile: boolean;
-}) {
-  const addToCart = useStore((s) => s.addToCart);
+// ─── Detail Panel ─────────────────────────────────────────────────────────────
+
+function DetailPanel({ model, onClose }: { model: RentalModel; onClose: () => void }) {
+  const addToCart = useStore(s => s.addToCart);
   const panelRef = useRef<HTMLDivElement>(null);
-  const accent = model.accentColor;
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const HookahComp = HOOKAH_COMPONENTS[model.id] ?? HookahClassic;
 
-  // Slide in on mount
   useEffect(() => {
-    const el = panelRef.current;
-    if (!el) return;
-    if (isMobile) {
-      gsap.fromTo(el, { y: "100%" }, { y: "0%", duration: 0.45, ease: "power3.out" });
-    } else {
-      gsap.fromTo(el, { x: "100%" }, { x: "0%", duration: 0.45, ease: "power3.out" });
-    }
-  }, [isMobile]);
+    if (!panelRef.current || !backdropRef.current) return;
+    gsap.fromTo(backdropRef.current, { opacity: 0 }, { opacity: 1, duration: 0.3 });
+    gsap.fromTo(panelRef.current, { x: "100%" }, { x: "0%", duration: 0.45, ease: "power3.out" });
+  }, []);
 
-  // ESC to close
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", fn);
+    return () => window.removeEventListener("keydown", fn);
+  }, [onClose]);
+
+  const close = useCallback(() => {
+    if (!panelRef.current || !backdropRef.current) { onClose(); return; }
+    gsap.to(panelRef.current, { x: "100%", duration: 0.35, ease: "power3.in" });
+    gsap.to(backdropRef.current, { opacity: 0, duration: 0.35, onComplete: onClose });
   }, [onClose]);
 
   const handleReserve = () => {
-    addToCart({
-      id: `rental-${model.id}`,
-      type: "rental",
-      name: `${model.name} Hookah (1 day)`,
-      price: model.dailyRate,
-      quantity: 1,
-    });
-    onClose();
+    addToCart({ id: `rental-${model.id}`, type: "rental", name: `${model.name} Hookah`, price: model.sessionRate, quantity: 1 });
+    close();
   };
-
-  const panelStyle: React.CSSProperties = isMobile
-    ? {
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: "72vh",
-        borderRadius: "20px 20px 0 0",
-        zIndex: 200,
-        overflowY: "auto",
-      }
-    : {
-        position: "fixed",
-        right: 0,
-        top: 0,
-        bottom: 0,
-        width: 360,
-        zIndex: 200,
-        overflowY: "auto",
-      };
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(5,3,10,0.55)",
-          zIndex: 199,
-          backdropFilter: "blur(2px)",
-        }}
-        aria-hidden="true"
-      />
-
-      {/* Panel */}
-      <div
-        ref={panelRef}
-        style={{
-          ...panelStyle,
-          background: "linear-gradient(160deg, #120d28 0%, #0d0a1e 100%)",
-          borderLeft: isMobile ? "none" : `1px solid ${accent}33`,
-          borderTop: isMobile ? `2px solid ${accent}` : "none",
-          boxShadow: isMobile
-            ? `0 -24px 60px rgba(5,3,10,0.8)`
-            : `-24px 0 60px rgba(5,3,10,0.8)`,
-          padding: "32px 28px 40px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 24,
-        }}
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${model.name} details`}
-      >
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          aria-label="Close detail panel"
-          style={{
-            alignSelf: "flex-end",
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            borderRadius: "50%",
-            width: 36,
-            height: 36,
-            color: "rgba(255,255,255,0.7)",
-            fontSize: 18,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            lineHeight: 1,
-          }}
-        >
-          ✕
-        </button>
-
-        {/* Hookah preview */}
-        <div style={{ display: "flex", justifyContent: "center", marginTop: -12 }}>
-          <HookahSVG color={accent} height={160} />
+      <div ref={backdropRef} onClick={close} style={{
+        position: "fixed", inset: 0, background: "rgba(5,3,10,0.65)", zIndex: 200,
+        backdropFilter: "blur(4px)",
+      }}/>
+      <div ref={panelRef} style={{
+        position: "fixed", right: 0, top: 0, bottom: 0,
+        width: "min(420px, 100vw)",
+        background: `linear-gradient(160deg, ${model.accentColor}14 0%, #0d0a1e 35%, #05030a 100%)`,
+        borderLeft: `1px solid ${model.accentColor}33`,
+        boxShadow: `-32px 0 80px rgba(5,3,10,0.9)`,
+        zIndex: 201,
+        overflowY: "auto",
+        display: "flex", flexDirection: "column",
+      }}>
+        {/* Header with hookah illustration */}
+        <div style={{
+          position: "relative",
+          height: 320,
+          background: `linear-gradient(160deg, ${model.accentColor}22 0%, rgba(13,10,30,0.8) 100%)`,
+          display: "flex", alignItems: "flex-end", justifyContent: "center",
+          overflow: "hidden",
+          flexShrink: 0,
+        }}>
+          {/* Spotlight */}
+          <div style={{
+            position: "absolute", top: 0, left: "50%",
+            transform: "translateX(-50%)",
+            width: 160, height: "90%",
+            background: `linear-gradient(to bottom, ${model.accentColor}40, transparent 90%)`,
+            clipPath: "polygon(30% 0%, 70% 0%, 80% 100%, 20% 100%)",
+            pointerEvents: "none",
+          }}/>
+          {/* Floor glow */}
+          <div style={{
+            position: "absolute", bottom: 10, left: "50%",
+            transform: "translateX(-50%)",
+            width: 180, height: 24, borderRadius: "50%",
+            background: `radial-gradient(ellipse, ${model.accentColor}66 0%, transparent 70%)`,
+            filter: "blur(8px)",
+          }}/>
+          <div style={{
+            width: model.id === "colossus" ? 180 : 130,
+            height: 280,
+            paddingBottom: 10,
+            filter: `drop-shadow(0 0 24px ${model.accentColor}cc) drop-shadow(0 0 60px ${model.accentColor}44)`,
+          }}>
+            <HookahComp color={model.accentColor} active={true} />
+          </div>
+          {/* Close */}
+          <button onClick={close} style={{
+            position: "absolute", top: 16, right: 16,
+            width: 36, height: 36, borderRadius: "50%",
+            background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.15)",
+            color: "rgba(255,255,255,0.7)", fontSize: 16,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>✕</button>
+          {/* Tier */}
+          <div style={{
+            position: "absolute", top: 16, left: 16,
+            background: TIER_COLORS[model.tier],
+            border: `1px solid ${TIER_TEXT[model.tier]}44`,
+            borderRadius: 30, padding: "4px 12px",
+            fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.2em",
+            color: TIER_TEXT[model.tier], textTransform: "uppercase",
+            backdropFilter: "blur(4px)",
+          }}>
+            {model.tier}
+          </div>
         </div>
 
-        {/* Tier badge */}
-        <div>
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 9,
-              letterSpacing: "0.18em",
-              color: accent,
-              border: `1px solid ${accent}66`,
-              padding: "3px 10px",
-              borderRadius: 4,
-              textTransform: "uppercase",
-            }}
-          >
-            {TIER_LABEL[model.tier]}
-          </span>
-        </div>
+        {/* Content */}
+        <div style={{ padding: "28px 28px 40px", display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* Name */}
+          <div>
+            <h2 style={{
+              fontFamily: "var(--font-serif)", fontSize: 44, fontWeight: 600, fontStyle: "italic",
+              color: "white", lineHeight: 0.95, letterSpacing: "-0.02em", marginBottom: 8,
+            }}>
+              {model.name}
+            </h2>
+            <p style={{
+              fontFamily: "var(--font-serif)", fontStyle: "italic",
+              fontSize: 16, color: "rgba(255,255,255,0.5)", lineHeight: 1.5,
+            }}>
+              {model.tagline}
+            </p>
+          </div>
 
-        {/* Name + tagline */}
-        <div>
-          <h3
-            style={{
-              fontFamily: "var(--font-bebas)",
-              fontSize: 38,
-              letterSpacing: "0.06em",
-              color: "#f0f2fa",
-              lineHeight: 0.95,
-              marginBottom: 10,
-              textTransform: "uppercase",
-            }}
-          >
-            {model.name}
-          </h3>
-          <p
-            style={{
-              fontFamily: "var(--font-barlow)",
-              fontSize: 13,
-              color: "rgba(255,255,255,0.5)",
-              lineHeight: 1.5,
-            }}
-          >
-            {model.tagline}
-          </p>
-        </div>
-
-        {/* Specs grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "16px 20px",
+          {/* Specs */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px",
             padding: "18px",
             background: "rgba(255,255,255,0.03)",
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.06)",
-          }}
-        >
-          {[
-            { label: "Height", value: model.height },
-            { label: "Material", value: model.material },
-            { label: "Hose Config", value: model.hoseType },
-            { label: "Available", value: `${model.available} units` },
-          ].map(({ label, value }) => (
-            <div key={label}>
-              <p
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 8,
-                  color: "rgba(255,255,255,0.3)",
-                  letterSpacing: "0.14em",
-                  textTransform: "uppercase",
-                  marginBottom: 4,
-                }}
-              >
-                {label}
-              </p>
-              <p
-                style={{
-                  fontFamily: "var(--font-barlow)",
-                  fontWeight: 700,
-                  fontSize: 12,
-                  color: "#f0f2fa",
-                  lineHeight: 1.3,
-                }}
-              >
-                {value}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* Pricing */}
-        <div style={{ display: "flex", gap: 20 }}>
-          <div
-            style={{
-              flex: 1,
-              padding: "14px 16px",
-              background: `${accent}12`,
-              border: `1px solid ${accent}33`,
-              borderRadius: 10,
-              textAlign: "center",
-            }}
-          >
-            <p
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 8,
-                color: "rgba(255,255,255,0.35)",
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                marginBottom: 6,
-              }}
-            >
-              Daily Rate
-            </p>
-            <p
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 26,
-                color: accent,
-                fontWeight: 700,
-                lineHeight: 1,
-              }}
-            >
-              ${model.dailyRate}
-            </p>
+            borderRadius: 14, border: "1px solid rgba(255,255,255,0.06)",
+          }}>
+            {[
+              { label: "Height", value: model.height },
+              { label: "Material", value: model.material },
+              { label: "Hose Config", value: model.hoseType },
+              { label: "Available", value: `${model.available} unit${model.available !== 1 ? "s" : ""}` },
+            ].map(({ label, value }) => (
+              <div key={label}>
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "rgba(255,255,255,0.28)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 4 }}>{label}</p>
+                <p style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.88)", lineHeight: 1.3 }}>{value}</p>
+              </div>
+            ))}
           </div>
-          <div
-            style={{
-              flex: 1,
-              padding: "14px 16px",
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 10,
-              textAlign: "center",
-            }}
-          >
-            <p
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 8,
-                color: "rgba(255,255,255,0.35)",
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                marginBottom: 6,
-              }}
-            >
-              Per Session
-            </p>
-            <p
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 26,
-                color: "rgba(255,255,255,0.55)",
-                fontWeight: 700,
-                lineHeight: 1,
-              }}
-            >
-              ${model.sessionRate}
-            </p>
-          </div>
-        </div>
 
-        {/* Stock badge */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
+          {/* Pricing */}
+          <div style={{ display: "flex", gap: 12 }}>
+            {[
+              { label: "Per Session", value: kes(model.sessionRate), accent: true },
+              { label: "Daily Rate", value: kes(model.dailyRate), accent: false },
+            ].map(({ label, value, accent }) => (
+              <div key={label} style={{
+                flex: 1, padding: "16px",
+                background: accent ? `${model.accentColor}14` : "rgba(255,255,255,0.03)",
+                border: `1px solid ${accent ? model.accentColor + "33" : "rgba(255,255,255,0.07)"}`,
+                borderRadius: 12, textAlign: "center",
+              }}>
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "rgba(255,255,255,0.3)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 6 }}>{label}</p>
+                <p style={{ fontFamily: "var(--font-serif)", fontSize: 22, fontWeight: 600, color: accent ? model.accentColor : "rgba(255,255,255,0.6)", lineHeight: 1 }}>{value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Availability indicator */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)" }}>
+            <div style={{
+              width: 10, height: 10, borderRadius: "50%", flexShrink: 0,
               background: model.available > 2 ? "#22d3ee" : model.available === 1 ? "#fbbf24" : "#6b5f88",
-              boxShadow:
-                model.available > 0
-                  ? `0 0 8px ${model.available > 2 ? "#22d3ee" : "#fbbf24"}`
-                  : "none",
-            }}
-            aria-hidden="true"
-          />
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 10,
-              letterSpacing: "0.1em",
-              color:
-                model.available > 2
-                  ? "var(--cyan-bright)"
-                  : model.available === 1
-                  ? "var(--gold-bright)"
-                  : "var(--text-dim)",
-              textTransform: "uppercase",
-            }}
-          >
-            {model.available > 2
-              ? "In Stock"
-              : model.available === 1
-              ? "Last Unit"
-              : `${model.available} Left`}
-          </span>
-        </div>
+              boxShadow: model.available > 0 ? `0 0 10px ${model.available > 2 ? "#22d3ee" : "#fbbf24"}` : "none",
+            }}/>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.12em", color: model.available > 2 ? "#22d3ee" : "#fbbf24", textTransform: "uppercase" }}>
+              {model.available > 2 ? `${model.available} units in stock — ready to deploy` : model.available === 1 ? "Last unit available — book fast" : `${model.available} units remaining`}
+            </span>
+          </div>
 
-        {/* CTA */}
-        <button
-          onClick={handleReserve}
-          className="btn-teal"
-          style={{ width: "100%", fontSize: 14, marginTop: "auto" }}
-        >
-          Reserve This Model
-        </button>
+          {/* CTA */}
+          <button onClick={handleReserve} className="btn-primary" style={{ width: "100%", fontSize: 15, minHeight: 54, marginTop: 4 }}>
+            Reserve {model.name} ↗
+          </button>
+          <p style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: 12, color: "rgba(255,255,255,0.2)", textAlign: "center" }}>
+            Added to cart · complete booking during checkout
+          </p>
+        </div>
       </div>
     </>
   );
 }
 
-// ─── Main Showroom Section ────────────────────────────────────────────────────
+// ─── Main Section ─────────────────────────────────────────────────────────────
+
 export default function RentalsSection() {
   const isMobile = useIsMobile();
   const sectionRef = useRef<HTMLElement>(null);
-  const showroomRef = useRef<HTMLDivElement>(null);
-  const pedestalRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const gridRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
 
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
-  const [entered, setEntered] = useState(false);
 
-  // Mouse parallax state
-  const mouseTarget = useRef({ x: 0, y: 0 });
-  const mouseCurrent = useRef({ x: 0, y: 0 });
-  const rafRef = useRef<number | null>(null);
-
-  // ── Entrance animation via IntersectionObserver ──────────────────────────
+  // Section entrance
   useEffect(() => {
-    const section = sectionRef.current;
-    if (!section) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !entered) {
-          setEntered(true);
-          // Stagger pedestals rising from below
-          pedestalRefs.current.forEach((el, i) => {
-            if (!el) return;
-            gsap.fromTo(
-              el,
-              { y: 80, opacity: 0 },
-              { y: 0, opacity: 1, duration: 0.8, delay: i * 0.1, ease: "power3.out" }
-            );
-          });
-          // Header fade in
-          if (headerRef.current) {
-            gsap.fromTo(
-              headerRef.current,
-              { y: 30, opacity: 0 },
-              { y: 0, opacity: 1, duration: 0.7, ease: "power2.out" }
-            );
-          }
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    observer.observe(section);
-    return () => observer.disconnect();
-  }, [entered]);
-
-  // ── Mouse parallax RAF loop ───────────────────────────────────────────────
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
-    const rect = sectionRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    mouseTarget.current = {
-      x: ((e.clientX - cx) / rect.width) * 2,
-      y: ((e.clientY - cy) / rect.height) * 2,
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isMobile) return;
-
-    const loop = () => {
-      const LERP = 0.08;
-      mouseCurrent.current.x +=
-        (mouseTarget.current.x - mouseCurrent.current.x) * LERP;
-      mouseCurrent.current.y +=
-        (mouseTarget.current.y - mouseCurrent.current.y) * LERP;
-
-      if (showroomRef.current) {
-        const rx = mouseCurrent.current.y * -4; // rotateX degrees
-        const ry = mouseCurrent.current.x * 6;  // rotateY degrees
-        showroomRef.current.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+    if (!sectionRef.current) return;
+    const ctx = gsap.context(() => {
+      gsap.fromTo(headerRef.current,
+        { y: 40, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.8, ease: "power3.out",
+          scrollTrigger: { trigger: sectionRef.current, start: "top 80%", once: true } }
+      );
+      const cards = gridRef.current?.querySelectorAll<HTMLElement>("[data-rental-pedestal]");
+      if (cards?.length) {
+        gsap.fromTo(Array.from(cards),
+          { y: 60, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.7, stagger: 0.08, ease: "power3.out",
+            scrollTrigger: { trigger: sectionRef.current, start: "top 70%", once: true } }
+        );
       }
-      rafRef.current = requestAnimationFrame(loop);
-    };
-
-    rafRef.current = requestAnimationFrame(loop);
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    };
-  }, [isMobile]);
-
-  // ── Select / deselect logic ───────────────────────────────────────────────
-  const handleSelect = useCallback((idx: number) => {
-    setSelectedIdx((prev) => (prev === idx ? null : idx));
+    }, sectionRef);
+    return () => ctx.revert();
   }, []);
 
-  const handleClose = useCallback(() => setSelectedIdx(null), []);
-
-  // ── Initial state: pedestals invisible until entrance anim ───────────────
-  const pedestalInitialStyle: React.CSSProperties = entered
-    ? {}
-    : { opacity: 0, transform: "translateY(80px)" };
+  const handleSelect = useCallback((idx: number) => {
+    setSelectedIdx(prev => prev === idx ? null : idx);
+  }, []);
 
   return (
     <section
       id="rentals"
       ref={sectionRef}
-      onMouseMove={handleMouseMove}
       style={{
         position: "relative",
-        minHeight: "100vh",
-        background: "var(--nebula)",
+        background: "var(--void)",
+        padding: "clamp(60px,8vw,100px) 0 80px",
         overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
       }}
     >
-      {/* ── Showroom Environment: ceiling ───────────────────────────────── */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: "30%",
-          background:
-            "linear-gradient(to bottom, #020108 0%, #0a0718 60%, transparent 100%)",
-          pointerEvents: "none",
-          zIndex: 1,
-        }}
-      />
-
-      {/* Ceiling panel texture lines */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: "28%",
-          backgroundImage:
-            "repeating-linear-gradient(90deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 60px)",
-          pointerEvents: "none",
-          zIndex: 2,
-        }}
-      />
-
-      {/* ── Side walls ──────────────────────────────────────────────────── */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(to right, rgba(5,3,10,0.85) 0%, transparent 18%, transparent 82%, rgba(5,3,10,0.85) 100%)",
-          pointerEvents: "none",
-          zIndex: 3,
-        }}
-      />
-
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div
-        ref={headerRef}
-        style={{
-          position: "relative",
-          zIndex: 10,
-          textAlign: "center",
-          padding: "clamp(48px,7vw,90px) 5vw 0",
-          opacity: 0, // set to 0; entrance anim sets to 1
-        }}
-      >
-        <p
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 10,
-            letterSpacing: "0.28em",
-            color: "var(--cyan-bright)",
-            textTransform: "uppercase",
-            marginBottom: 14,
-          }}
-        >
-          THE SHOWROOM · 6 MODELS
-        </p>
-        <h2
-          style={{
-            fontFamily: "var(--font-bebas)",
-            fontSize: "clamp(44px, 7vw, 96px)",
-            letterSpacing: "0.05em",
-            color: "var(--text-primary)",
-            lineHeight: 0.92,
-            marginBottom: 16,
-            textTransform: "uppercase",
-          }}
-        >
-          CHOOSE YOUR PIECE.
-        </h2>
-        <p
-          style={{
-            fontFamily: "var(--font-barlow)",
-            fontSize: "clamp(12px, 1.4vw, 15px)",
-            color: "rgba(255,255,255,0.4)",
-            maxWidth: 420,
-            margin: "0 auto",
-            lineHeight: 1.6,
-          }}
-        >
-          Step inside. Six masterpieces await. Click a pedestal to inspect.
-        </p>
+      {/* Ambient background */}
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+        <div style={{ position: "absolute", width: 800, height: 800, borderRadius: "50%", background: "radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%)", top: "10%", left: "-15%" }}/>
+        <div style={{ position: "absolute", width: 600, height: 600, borderRadius: "50%", background: "radial-gradient(circle, rgba(6,182,212,0.06) 0%, transparent 70%)", bottom: "5%", right: "-10%" }}/>
+        {/* Floor reflection line */}
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, background: "rgba(124,58,237,0.2)" }}/>
       </div>
 
-      {/* ── 3D Showroom Stage ────────────────────────────────────────────── */}
-      <div
-        style={{
-          position: "relative",
-          flex: 1,
-          minHeight: isMobile ? 420 : 560,
-          perspective: 1200,
-          perspectiveOrigin: "50% 30%",
-          zIndex: 5,
-        }}
-      >
-        {/* Showroom group — receives mouse parallax rotation */}
-        <div
-          ref={showroomRef}
-          style={{
-            position: "absolute",
-            inset: 0,
-            transformStyle: "preserve-3d",
-            transformOrigin: "50% 50%",
-            transition: isMobile ? "none" : undefined,
-          }}
-        >
-          {/* ── Floor ─────────────────────────────────────────────────── */}
-          <div
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: "-20%",
-              right: "-20%",
-              height: "55%",
-              background: "linear-gradient(to bottom, #0d0a1e 0%, #05030a 100%)",
-              backgroundImage: [
-                "linear-gradient(to bottom, #0d0a1e 0%, #05030a 100%)",
-                "repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 80px)",
-                "repeating-linear-gradient(0deg, rgba(255,255,255,0.018) 0px, rgba(255,255,255,0.018) 1px, transparent 1px, transparent 60px)",
-              ].join(", "),
-              transformStyle: "preserve-3d",
-            }}
-          />
-
-          {/* Floor reflection shimmer */}
-          <div
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: "25%",
-              background:
-                "linear-gradient(to top, rgba(124,58,237,0.04) 0%, transparent 100%)",
-              pointerEvents: "none",
-            }}
-          />
-
-          {/* ── Pedestals container ───────────────────────────────────── */}
-          <div
-            style={{
-              position: "absolute",
-              bottom: isMobile ? "18%" : "22%",
-              left: 0,
-              right: 0,
-              height: 320,
-              transformStyle: "preserve-3d",
-            }}
-          >
-            {isMobile ? (
-              // Mobile: horizontal scroll list instead of 3D perspective
-              <div
-                style={{
-                  display: "flex",
-                  gap: 20,
-                  overflowX: "auto",
-                  scrollSnapType: "x mandatory",
-                  scrollbarWidth: "none",
-                  padding: "20px 10vw",
-                  alignItems: "flex-end",
-                  height: "100%",
-                }}
-              >
-                {RENTAL_MODELS.map((model, i) => (
-                  <div
-                    key={model.id}
-                    onClick={() => handleSelect(i)}
-                    style={{
-                      flex: "0 0 auto",
-                      scrollSnapAlign: "center",
-                      width: 130,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      opacity: selectedIdx !== null && selectedIdx !== i ? 0.3 : 1,
-                      transition: "opacity 0.4s ease",
-                    }}
-                  >
-                    <div style={{ filter: `drop-shadow(0 0 12px ${model.accentColor}88)` }}>
-                      <HookahSVG color={model.accentColor} height={140} />
-                    </div>
-                    <div
-                      style={{
-                        width: "100%",
-                        background: "rgba(13,10,30,0.95)",
-                        border: `1px solid ${model.accentColor}44`,
-                        borderRadius: 8,
-                        padding: "8px 10px",
-                        textAlign: "center",
-                        marginTop: 8,
-                        boxShadow:
-                          selectedIdx === i
-                            ? `0 0 20px ${model.accentColor}55`
-                            : "none",
-                      }}
-                    >
-                      <p
-                        style={{
-                          fontFamily: "var(--font-bebas)",
-                          fontSize: 14,
-                          color: "#f0f2fa",
-                          letterSpacing: "0.08em",
-                        }}
-                      >
-                        {model.name}
-                      </p>
-                      <p
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 8,
-                          color: model.accentColor,
-                          letterSpacing: "0.12em",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        {TIER_LABEL[model.tier]}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              // Desktop: full 3D perspective pedestals
-              RENTAL_MODELS.map((model, i) => (
-                <PedestalUnit
-                  key={model.id}
-                  model={model}
-                  index={i}
-                  isSelected={selectedIdx === i}
-                  isDeselected={selectedIdx !== null && selectedIdx !== i}
-                  onSelect={() => handleSelect(i)}
-                  pedestalRef={(el) => {
-                    pedestalRefs.current[i] = el;
-                  }}
-                />
-              ))
-            )}
+      {/* Header */}
+      <div ref={headerRef} style={{
+        padding: "0 clamp(20px,6vw,80px)",
+        marginBottom: 52,
+        position: "relative", zIndex: 1,
+        opacity: 0,
+      }}>
+        <p className="section-label">The Showroom</p>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 24, flexWrap: "wrap" }}>
+          <div>
+            <h2 style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: "clamp(52px,7vw,96px)",
+              fontWeight: 600, fontStyle: "italic",
+              color: "white", lineHeight: 0.95,
+              letterSpacing: "-0.02em", marginBottom: 14,
+            }}>
+              Select Your<br/>
+              <span style={{ color: "var(--cyan-bright)" }}>Piece.</span>
+            </h2>
+            <p style={{
+              fontFamily: "var(--font-serif)", fontStyle: "italic",
+              fontSize: "clamp(15px,1.8vw,18px)",
+              color: "rgba(255,255,255,0.4)", lineHeight: 1.6, maxWidth: 480,
+            }}>
+              Six masterworks. Every one handpicked. Tap any piece to inspect it up close and lock it in for your session.
+            </p>
+          </div>
+          <div style={{
+            fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.2em",
+            color: "rgba(255,255,255,0.2)", textTransform: "uppercase",
+            alignSelf: "flex-end", paddingBottom: 4,
+          }}>
+            {RENTAL_MODELS.length} models available
           </div>
         </div>
       </div>
 
-      {/* ── Hint text ───────────────────────────────────────────────────── */}
-      <div
-        style={{
-          position: "relative",
-          zIndex: 10,
-          textAlign: "center",
-          padding: "0 5vw clamp(32px, 5vw, 60px)",
-        }}
-      >
-        {isMobile ? (
-          <p
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 9,
-              color: "var(--cyan-bright)",
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              opacity: 0.6,
-            }}
-          >
-            ← swipe · tap to inspect →
-          </p>
-        ) : (
-          <p
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 9,
-              color: "rgba(255,255,255,0.25)",
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-            }}
-          >
-            Click a pedestal · Move cursor to pan the showroom
-          </p>
-        )}
+      {/* Grid — all 6 fully clickable */}
+      <div ref={gridRef} style={{
+        padding: "0 clamp(20px,6vw,80px)",
+        display: "grid",
+        gridTemplateColumns: isMobile
+          ? "repeat(2, 1fr)"
+          : "repeat(3, 1fr)",
+        gap: isMobile ? 12 : 20,
+        position: "relative", zIndex: 1,
+      }}>
+        {RENTAL_MODELS.map((model, i) => (
+          <ModelCard
+            key={model.id}
+            model={model}
+            isSelected={selectedIdx === i}
+            onSelect={() => handleSelect(i)}
+            isMobile={isMobile}
+          />
+        ))}
       </div>
 
-      {/* ── Detail Panel (portal-like, fixed) ───────────────────────────── */}
+      {/* Footer hint */}
+      <div style={{ textAlign: "center", marginTop: 36, padding: "0 5vw", position: "relative", zIndex: 1 }}>
+        <p style={{
+          fontFamily: "var(--font-serif)", fontStyle: "italic",
+          fontSize: 13, color: "rgba(255,255,255,0.18)",
+        }}>
+          Tap any piece to inspect · all prices in KES · delivery included within Nairobi
+        </p>
+      </div>
+
+      {/* Detail panel */}
       {selectedIdx !== null && (
         <DetailPanel
           model={RENTAL_MODELS[selectedIdx]}
-          onClose={handleClose}
-          isMobile={isMobile}
+          onClose={() => setSelectedIdx(null)}
         />
       )}
     </section>
