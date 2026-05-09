@@ -1,6 +1,6 @@
 "use client";
 import React, {
-  useEffect, useRef, useState, useCallback, useMemo, memo, forwardRef,
+  useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo, forwardRef,
 } from "react";
 import { gsap } from "gsap";
 import { FLAVOURS, getStockStatus, type Flavour } from "@/data/flavours";
@@ -8,11 +8,12 @@ import { useStore } from "@/store/useStore";
 import { useIsMobile } from "@/context/MobileContext";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-type Layout = "TABLE" | "SPHERE" | "HELIX" | "GRID";
+type Layout = "SPHERE" | "HELIX" | "GRID";
 
-const CARD_W = 200;
-const CARD_H = 240;
-const COLS   = 6;  // 36 cards → 6×6 table
+const CARD_W = 180;
+const CARD_H = 220;
+const OFFSET_X = -90;  // -CARD_W/2
+const OFFSET_Y = -110; // -CARD_H/2
 
 const CATEGORY_COLORS: Record<string, string> = {
   Classic:   "#e74c3c",
@@ -33,57 +34,34 @@ const INTENSITY_COLORS: Record<string, string> = {
 };
 
 const LAYOUT_META: Record<Layout, { label: string; hint: string }> = {
-  TABLE:  { label: "Table View",    hint: "Browse by category & intensity" },
-  SPHERE: { label: "Sphere View",   hint: "Drag to rotate the flavour globe" },
-  HELIX:  { label: "Helix View",    hint: "Drag to spin the DNA spiral" },
-  GRID:   { label: "Grid View",     hint: "Clean collection overview" },
+  SPHERE: { label: "Sphere View", hint: "Drag to rotate the flavour globe" },
+  HELIX:  { label: "Helix View",  hint: "Drag to spin the DNA spiral" },
+  GRID:   { label: "Grid View",   hint: "Drag to orbit — depth reveals layers" },
 };
 
-// ─── Layout position calculators ─────────────────────────────────────────────
+// ─── Position types ───────────────────────────────────────────────────────────
 interface Pos { x: number; y: number; z: number; rx: number; ry: number; rz: number; }
 
-function tablePos(): Pos[] {
-  // 6 columns = intensities × categories spread
-  // Row = group of 6 per row, column by intensity cycling
-  const CATS = ["Classic","Fresh","Fruity","Tropical","Floral","Specialty","Novelty","Mystery","Premium"] as const;
-  return FLAVOURS.map((f) => {
-    const catIdx = CATS.indexOf(f.category as typeof CATS[number]);
-    const inRow  = catIdx < 0 ? 0 : catIdx;
-    const colMap: Record<string, number> = { Mild: 0, Medium: 1, Strong: 2 };
-    const baseCol = (colMap[f.intensity] ?? 0) * 2;
-    // Within same cat+intensity, offset by sub-index
-    const sameGroup = FLAVOURS.filter(x => x.category === f.category && x.intensity === f.intensity);
-    const subIdx = sameGroup.findIndex(x => x.id === f.id);
-    const col = baseCol + (subIdx % 2);
-    const padX = (COLS - 1) * (CARD_W + 24) / 2;
-    return {
-      x: col * (CARD_W + 24) - padX,
-      y: -inRow * (CARD_H + 20) + (4 * (CARD_H + 20) / 2),
-      z: 0, rx: 0, ry: 0, rz: 0,
-    };
-  });
-}
-
+// ─── Layout position calculators ─────────────────────────────────────────────
 function spherePos(): Pos[] {
   const N = FLAVOURS.length;
-  const R = Math.max(420, CARD_W * 1.8);
+  const R = 500;
   return FLAVOURS.map((_, i) => {
     const phi   = Math.acos(1 - (2 * (i + 0.5)) / N);
     const theta = Math.PI * (1 + Math.sqrt(5)) * i;
     const x = R * Math.sin(phi) * Math.cos(theta);
     const y = R * Math.sin(phi) * Math.sin(theta);
     const z = R * Math.cos(phi);
-    // Face outward
     const ry = Math.atan2(x, z) * (180 / Math.PI);
-    const rx = -Math.atan2(y, Math.sqrt(x*x+z*z)) * (180 / Math.PI);
+    const rx = -Math.atan2(y, Math.sqrt(x * x + z * z)) * (180 / Math.PI);
     return { x, y, z, rx, ry, rz: 0 };
   });
 }
 
 function helixPos(): Pos[] {
   const N = FLAVOURS.length;
-  const R = 280;
-  const H = (N / 2) * 90;
+  const R = 300;
+  const H = 1400;
   return FLAVOURS.map((_, i) => {
     const strand = i % 2 === 0 ? 1 : -1;
     const t = i / (N - 1);
@@ -97,24 +75,35 @@ function helixPos(): Pos[] {
 }
 
 function gridPos(): Pos[] {
-  const cols = isMobileGlobal() ? 2 : 4;
-  const padX = (cols - 1) * (CARD_W + 28) / 2;
-  const rows  = Math.ceil(FLAVOURS.length / cols);
-  return FLAVOURS.map((_, i) => ({
-    x: (i % cols) * (CARD_W + 28) - padX,
-    y: -(Math.floor(i / cols) - (rows - 1) / 2) * (CARD_H + 28),
-    z: 0, rx: 0, ry: 0, rz: 0,
-  }));
-}
+  // 4×4×3 cuboid: 4 cols, 4 rows, 3 layers. 48 slots, use first 36.
+  const COLS   = 4;
+  const ROWS   = 4;
+  const LAYERS = 3;
+  const gapX = CARD_W + 28;
+  const gapY = CARD_H + 28;
+  const gapZ = 400;
+  const padX = ((COLS - 1) * gapX) / 2;
+  const padY = ((ROWS - 1) * gapY) / 2;
 
-function isMobileGlobal() {
-  if (typeof window === "undefined") return false;
-  return window.innerWidth < 768;
+  return FLAVOURS.map((_, i) => {
+    const layer = Math.floor(i / (COLS * ROWS));
+    const rem   = i % (COLS * ROWS);
+    const col   = rem % COLS;
+    const row   = Math.floor(rem / COLS);
+    const safeLayer = Math.min(layer, LAYERS - 1);
+    return {
+      x:   col * gapX - padX,
+      y:   row * gapY - padY,
+      z:  -safeLayer * gapZ,
+      rx:  0,
+      ry:  0,
+      rz:  0,
+    };
+  });
 }
 
 function getPositions(layout: Layout): Pos[] {
   switch (layout) {
-    case "TABLE":  return tablePos();
     case "SPHERE": return spherePos();
     case "HELIX":  return helixPos();
     case "GRID":   return gridPos();
@@ -219,7 +208,6 @@ const FlavourModal = memo(function FlavourModal({
           display: "flex", alignItems: "center", justifyContent: "center",
           position: "relative", overflow: "hidden",
         }}>
-          {/* Decorative rings */}
           {[200, 140, 80].map((size, ri) => (
             <div key={ri} style={{
               position: "absolute",
@@ -386,10 +374,10 @@ const FlavourModal = memo(function FlavourModal({
 });
 
 // ─── Individual card ──────────────────────────────────────────────────────────
-interface CardProps { flavour: Flavour; onClick: () => void; visible: boolean; }
+interface CardProps { flavour: Flavour; onClick: () => void; }
 
 const FlavourCard = forwardRef<HTMLDivElement, CardProps>(
-function FlavourCard({ flavour, onClick, visible }, ref) {
+function FlavourCard({ flavour, onClick }, ref) {
   const accent   = CATEGORY_COLORS[flavour.category] ?? "#22d3ee";
   const intColor = INTENSITY_COLORS[flavour.intensity];
   const stock    = getStockStatus(flavour.stock);
@@ -403,12 +391,12 @@ function FlavourCard({ flavour, onClick, visible }, ref) {
         width: CARD_W,
         height: CARD_H,
         position: "absolute",
+        // No CSS transform — GSAP drives all transform including offset
         willChange: "transform",
         transformStyle: "preserve-3d",
         cursor: "pointer",
-        opacity: visible ? 1 : 0,
-        pointerEvents: visible ? "auto" : "none",
-        transition: "opacity 0.3s ease",
+        // Start invisible until useLayoutEffect places them
+        opacity: 0,
       }}
     >
       <div
@@ -531,124 +519,62 @@ export default function FlavourWall() {
   const isMobile = useIsMobile();
   const addToCart = useStore((s) => s.addToCart);
 
-  const [layout, setLayout]         = useState<Layout>("GRID");
-  const [targetLayout, setTarget]   = useState<Layout>("GRID");
-  const [category, setCategory]     = useState("All");
+  const [layout, setLayout]       = useState<Layout>("SPHERE");
+  const [category, setCategory]   = useState("All");
   const [selectedFlavour, setSelected] = useState<Flavour | null>(null);
-  const [morphing, setMorphing]     = useState(false);
+  const [morphing, setMorphing]   = useState(false);
+  // Track target layout for button highlight
+  const [targetLayout, setTarget] = useState<Layout>("SPHERE");
 
-  const sceneRef   = useRef<HTMLDivElement>(null);
-  const wrapRef    = useRef<HTMLDivElement>(null);
-  const cardRefs   = useRef<(HTMLDivElement | null)[]>([]);
-  const positions  = useRef<Pos[]>([]);
+  const sceneRef  = useRef<HTMLDivElement>(null);
+  const cardRefs  = useRef<(HTMLDivElement | null)[]>([]);
 
-  // Camera state (for all-axis orbit via drag)
+  // Orbit state — all in refs, no React state
   const orbitRef       = useRef({ x: 0, y: 0 });
   const targetOrbitRef = useRef({ x: 0, y: 0 });
   const velRef         = useRef({ x: 0, y: 0 });
   const isDragging     = useRef(false);
   const lastPointer    = useRef({ x: 0, y: 0 });
   const rafOrbit       = useRef<number>(0);
+  const currentLayout  = useRef<Layout>("SPHERE");
 
-  // Init card refs array
-  useEffect(() => {
-    cardRefs.current = cardRefs.current.slice(0, FLAVOURS.length);
-  }, []);
-
-  // ── Apply positions to DOM cards ──────────────────────────────────────────
-  const applyPositions = useCallback((plist: Pos[], animate: boolean, onDone?: () => void) => {
-    const els = cardRefs.current;
-    if (!els.length) return;
-
-    if (!animate) {
-      els.forEach((el, i) => {
-        if (!el || !plist[i]) return;
-        const p = plist[i];
-        el.style.transform = `translate3d(${p.x}px,${p.y}px,${p.z}px) rotateX(${p.rx}deg) rotateY(${p.ry}deg) rotateZ(${p.rz}deg)`;
-      });
-      onDone?.();
-      return;
-    }
-
-    let done = 0;
-    els.forEach((el, i) => {
+  // ── Apply initial sphere positions synchronously before first paint ──────
+  useLayoutEffect(() => {
+    const plist = spherePos();
+    cardRefs.current.forEach((el, i) => {
       if (!el || !plist[i]) return;
-      const p    = plist[i];
-      const delay = i * 0.014 + Math.random() * 0.03;
-
-      // Scale dip mid-transition
-      gsap.to(el, {
-        scale: 0.72, opacity: 0.2,
-        duration: 0.28, delay,
-        ease: "power2.in",
-      });
-      gsap.to(el, {
-        scale: 1, opacity: 1,
-        duration: 0.42, delay: delay + 0.3,
-        ease: "back.out(1.6)",
-        onComplete() {
-          done++;
-          if (done === els.filter(Boolean).length) onDone?.();
-        },
-      });
-      gsap.to(el, {
-        x: p.x, y: p.y, z: p.z,
-        rotationX: p.rx, rotationY: p.ry, rotationZ: p.rz,
-        duration: 1.1,
-        delay,
-        ease: "power4.out",
+      const p = plist[i];
+      // GSAP set: positions are relative to center of scene root.
+      // Card has CSS offset (OFFSET_X, OFFSET_Y) built in, so we add those to x/y.
+      gsap.set(el, {
+        x: p.x + OFFSET_X,
+        y: p.y + OFFSET_Y,
+        z: p.z,
+        rotationX: p.rx,
+        rotationY: p.ry,
+        rotationZ: p.rz,
+        opacity: 1,
+        scale: 1,
       });
     });
-  }, []);
-
-  // ── Morph to new layout ───────────────────────────────────────────────────
-  const morphTo = useCallback((next: Layout) => {
-    if (morphing || next === layout) return;
-    setMorphing(true);
-    setTarget(next);
-
-    // Reset orbit for flat layouts
-    if (next === "TABLE" || next === "GRID") {
-      gsap.to(orbitRef.current, {
-        x: 0, y: 0, duration: 0.8, ease: "power3.out",
-        onUpdate: () => {
-          targetOrbitRef.current = { ...orbitRef.current };
-          if (sceneRef.current) {
-            sceneRef.current.style.transform =
-              `rotateX(${orbitRef.current.x}deg) rotateY(${orbitRef.current.y}deg)`;
-          }
-        },
-      });
-    }
-
-    const plist = getPositions(next);
-    positions.current = plist;
-    applyPositions(plist, true, () => {
-      setLayout(next);
-      setMorphing(false);
-    });
-  }, [morphing, layout, applyPositions]);
-
-  // ── Initial positions ─────────────────────────────────────────────────────
-  useEffect(() => {
-    const plist = getPositions("GRID");
-    positions.current = plist;
-    // Slight delay so refs are all mounted
-    requestAnimationFrame(() => applyPositions(plist, false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Orbit animation loop ──────────────────────────────────────────────────
+  // ── Orbit animation RAF loop ──────────────────────────────────────────────
   useEffect(() => {
     let running = true;
     const loop = () => {
       if (!running) return;
       rafOrbit.current = requestAnimationFrame(loop);
       if (!isDragging.current) {
-        velRef.current.x *= 0.9;
-        velRef.current.y *= 0.9;
+        velRef.current.x *= 0.88;
+        velRef.current.y *= 0.88;
         targetOrbitRef.current.x += velRef.current.x;
         targetOrbitRef.current.y += velRef.current.y;
+      }
+      // Clamp X for grid so it doesn't flip
+      if (currentLayout.current === "GRID") {
+        targetOrbitRef.current.x = Math.max(-60, Math.min(60, targetOrbitRef.current.x));
       }
       orbitRef.current.x += (targetOrbitRef.current.x - orbitRef.current.x) * 0.1;
       orbitRef.current.y += (targetOrbitRef.current.y - orbitRef.current.y) * 0.1;
@@ -661,7 +587,86 @@ export default function FlavourWall() {
     return () => { running = false; cancelAnimationFrame(rafOrbit.current); };
   }, []);
 
-  // ── Pointer handlers (drag orbit) ─────────────────────────────────────────
+  // ── Ultra-smooth layout morph ─────────────────────────────────────────────
+  const morphTo = useCallback((next: Layout) => {
+    if (morphing || next === currentLayout.current) return;
+    setMorphing(true);
+    setTarget(next);
+
+    const doMorph = () => {
+      const plist = getPositions(next);
+      const els = cardRefs.current;
+
+      // Kill all running tweens first
+      els.forEach(el => { if (el) gsap.killTweensOf(el); });
+
+      // Phase 1: scale to 0.001, fade to 0 (0.25s)
+      els.forEach((el, i) => {
+        if (!el) return;
+        const delay = i * 0.012;
+        gsap.to(el, {
+          scale: 0.001,
+          opacity: 0,
+          duration: 0.25,
+          delay,
+          ease: "power2.in",
+        });
+      });
+
+      // Phase 2: snap positions while invisible, then fade/scale back in
+      // All cards fade out by: 0.25 + lastCardDelay = 0.25 + (N-1)*0.012
+      const maxPhase1 = 0.25 + (els.length - 1) * 0.012;
+      const validEls = els.filter(Boolean);
+      const lastIdx = validEls.length - 1;
+
+      els.forEach((el, i) => {
+        if (!el || !plist[i]) return;
+        const p = plist[i];
+        const revealDelay = maxPhase1 + i * 0.012;
+
+        // Snap position to new layout just before reveal (while opacity=0)
+        gsap.delayedCall(maxPhase1 - 0.02, () => {
+          gsap.set(el, {
+            x: p.x + OFFSET_X,
+            y: p.y + OFFSET_Y,
+            z: p.z,
+            rotationX: p.rx,
+            rotationY: p.ry,
+            rotationZ: p.rz,
+          });
+        });
+
+        // Reveal: scale + fade back in (staggered)
+        gsap.to(el, {
+          scale: 1,
+          opacity: 1,
+          duration: 1.0,
+          delay: revealDelay,
+          ease: "power4.out",
+          onComplete: i === lastIdx ? () => {
+            currentLayout.current = next;
+            setLayout(next);
+            setMorphing(false);
+          } : undefined,
+        });
+      });
+    };
+
+    // For sphere↔helix: reset orbit Y to 0 first, then morph
+    if (
+      (currentLayout.current === "SPHERE" && next === "HELIX") ||
+      (currentLayout.current === "HELIX" && next === "SPHERE")
+    ) {
+      gsap.to(targetOrbitRef.current, {
+        x: 0, y: 0, duration: 0.8, ease: "power3.out",
+        onComplete: doMorph,
+      });
+    } else {
+      doMorph();
+    }
+  }, [morphing]);
+
+  // ── Pointer handlers ──────────────────────────────────────────────────────
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     isDragging.current = true;
     lastPointer.current = { x: e.clientX, y: e.clientY };
@@ -684,7 +689,7 @@ export default function FlavourWall() {
     isDragging.current = false;
   }, []);
 
-  // ── Category filter — fade non-matches ────────────────────────────────────
+  // ── Category filter via GSAP — does NOT re-morph ──────────────────────────
   useEffect(() => {
     cardRefs.current.forEach((el, i) => {
       if (!el) return;
@@ -692,7 +697,7 @@ export default function FlavourWall() {
       const visible = category === "All" || f.category === category;
       gsap.to(el, {
         opacity: visible ? 1 : 0,
-        scale: visible ? 1 : 0.7,
+        scale:   visible ? 1 : 0.5,
         duration: 0.35,
         ease: "power2.out",
       });
@@ -708,20 +713,7 @@ export default function FlavourWall() {
     ["All", ...Array.from(new Set(FLAVOURS.map(f => f.category)))],
   []);
 
-  const isDraggable = layout === "SPHERE" || layout === "HELIX";
-
-  // ── How big the scene container needs to be ───────────────────────────────
-  const sceneH = useMemo(() => {
-    switch (layout) {
-      case "SPHERE": return Math.max(420, CARD_W * 1.8) * 2 + CARD_H;
-      case "HELIX":  return (FLAVOURS.length / 2) * 90 + CARD_H;
-      case "TABLE":  return 9 * (CARD_H + 20) + CARD_H;
-      case "GRID": {
-        const cols = isMobile ? 2 : 4;
-        return Math.ceil(FLAVOURS.length / cols) * (CARD_H + 28) + CARD_H;
-      }
-    }
-  }, [layout, isMobile]);
+  const stageH = isMobile ? 500 : 700;
 
   return (
     <section
@@ -768,7 +760,7 @@ export default function FlavourWall() {
           fontFamily: "var(--font-barlow)", fontSize: "clamp(13px,1.8vw,16px)",
           color: "rgba(255,255,255,0.45)", maxWidth: 400, margin: "0 auto",
         }}>
-          36 premium blends, four ways to explore. Click any card to go deeper.
+          36 premium blends, three ways to explore. Click any card to go deeper.
         </p>
       </div>
 
@@ -779,7 +771,7 @@ export default function FlavourWall() {
         flexWrap: "wrap",
         padding: isMobile ? "28px 16px 0" : "32px 5vw 0",
       }}>
-        {(["TABLE","SPHERE","HELIX","GRID"] as Layout[]).map((l) => (
+        {(["SPHERE", "HELIX", "GRID"] as Layout[]).map((l) => (
           <button
             key={l}
             onClick={() => morphTo(l)}
@@ -811,8 +803,7 @@ export default function FlavourWall() {
         fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.2em",
         textTransform: "uppercase", color: "rgba(255,255,255,0.25)",
       }}>
-        {LAYOUT_META[targetLayout].hint}
-        {isDraggable && " · all axes"}
+        {LAYOUT_META[targetLayout].hint} · drag to orbit all axes
       </p>
 
       {/* ── Category filter ── */}
@@ -843,32 +834,33 @@ export default function FlavourWall() {
         ))}
       </div>
 
-      {/* ── 3D Stage ── */}
+      {/* ── 3D Stage — fixed pixel height, no overflow ── */}
       <div
-        ref={wrapRef}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
         style={{
-          position: "relative", zIndex: 5,
+          position: "relative",
+          zIndex: 5,
           width: "100%",
-          height: Math.max(sceneH, isMobile ? 500 : 700),
-          overflow: "visible",
-          perspective: "1200px",
+          height: stageH,
+          overflow: "hidden",
+          perspective: "1400px",
           perspectiveOrigin: "50% 50%",
-          cursor: isDraggable ? (isDragging.current ? "grabbing" : "grab") : "default",
+          cursor: isDragging.current ? "grabbing" : "grab",
           touchAction: "none",
           marginTop: 24,
           userSelect: "none",
         }}
       >
-        {/* Scene root — rotated by orbit */}
+        {/* Scene root — rotated by orbit RAF, centered */}
         <div
           ref={sceneRef}
           style={{
             position: "absolute",
-            top: "50%", left: "50%",
+            top: "50%",
+            left: "50%",
             transformStyle: "preserve-3d",
             willChange: "transform",
           }}
@@ -877,7 +869,6 @@ export default function FlavourWall() {
             <FlavourCard
               key={f.id}
               flavour={f}
-              visible={category === "All" || f.category === category}
               onClick={() => setSelected(f)}
               ref={(el) => { cardRefs.current[i] = el; }}
             />
