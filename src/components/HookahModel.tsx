@@ -48,9 +48,12 @@ export default function HookahModel({
   useFrame((_, delta) => {
     if (!groupRef.current) return;
 
-    // Smooth mouse parallax — wide rotation range for full 3D feel
-    rotX.current += (mouseY * -0.5 - rotX.current) * 0.04;
-    rotY.current += (mouseX *  0.7 - rotY.current) * 0.04;
+    // Direct mouse-driven rotation — full 3D range like FlavourWall orbit
+    // mouseX/Y are -1 to 1, map to ±55° Y and ±35° X
+    const targetY =  mouseX * 0.96; // ~55°
+    const targetX = -mouseY * 0.61; // ~35°
+    rotX.current += (targetX - rotX.current) * 0.08;
+    rotY.current += (targetY - rotY.current) * 0.08;
     groupRef.current.rotation.x = rotX.current;
     groupRef.current.rotation.y = rotY.current;
 

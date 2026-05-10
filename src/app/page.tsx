@@ -53,12 +53,12 @@ function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: numbe
         mouseX={mouseX}
         mouseY={mouseY}
         scale={isMobile ? 0.9 : 1.9}
-        position={isMobile ? [0, 0, 0] : [1.8, -0.3, 0]}
+        position={isMobile ? [0, 0.2, 0] : [1.8, 0.4, 0]}
       />
 
       {/* Smoke + embers rising from bowl — bowl top at world Y≈1.5, X≈1.8 */}
       {!isMobile && (
-        <SmokeParticles bowlY={1.52} bowlX={1.8} bowlZ={0} radius={0.07} />
+        <SmokeParticles bowlY={2.20} bowlX={1.8} bowlZ={0} radius={0.09} />
       )}
 
       {/* Sparkles orbiting — desktop only */}

@@ -30,7 +30,7 @@ const SMOKE_VERT = `
     pos.z *= spread;
 
     // Fade: quick in, long out
-    vAlpha = smoothstep(0.0, 0.08, t) * (1.0 - smoothstep(0.4, 1.0, t)) * 0.45;
+    vAlpha = smoothstep(0.0, 0.06, t) * (1.0 - smoothstep(0.55, 1.0, t)) * 0.68;
 
     vec4 mv = modelViewMatrix * vec4(pos, 1.0);
     gl_PointSize = aSize * spread * (400.0 / -mv.z);
@@ -96,8 +96,8 @@ const EMBER_FRAG = `
   }
 `;
 
-const SMOKE_COUNT = 120;
-const EMBER_COUNT = 60;
+const SMOKE_COUNT = 220;
+const EMBER_COUNT = 80;
 
 interface SmokeParticlesProps {
   bowlY?: number;   // world-space Y position of bowl opening
@@ -134,7 +134,7 @@ export default function SmokeParticles({
       pos[i * 3 + 2] = bowlZ + Math.sin(theta) * r;
       life[i]   = Math.random();
       speeds[i] = 0.12 + Math.random() * 0.14;
-      sizes[i]  = 0.04 + Math.random() * 0.09;
+      sizes[i]  = 0.07 + Math.random() * 0.14;
       drifts[i] = 0.03 + Math.random() * 0.08;
       angles[i] = Math.random() * Math.PI * 2;
     }
