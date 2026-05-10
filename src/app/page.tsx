@@ -52,7 +52,7 @@ function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: numbe
         mouseX={mouseX}
         mouseY={mouseY}
         scale={isMobile ? 0.9 : 1.9}
-        position={isMobile ? [0, 0, 0] : [1.6, 0.2, 0]}
+        position={isMobile ? [0, 0, 0] : [2.8, -0.3, 0]}
       />
 
       {/* Magenta sparkles orbiting — desktop only */}
