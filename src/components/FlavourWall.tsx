@@ -567,17 +567,19 @@ function DesktopWall({
         {LAYOUT_META[targetLayout].hint}
       </p>
 
-      {/* 3D Stage */}
+      {/* 3D Stage — height must contain whatever layout is active */}
       <div
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
         style={{
-          position: "relative", zIndex: 5, width: "100%", height: 1300,
-          overflow: "visible",
+          position: "relative", zIndex: 5, width: "100%",
+          height: targetLayout === "HELIX" ? 2000 : 1300,
+          overflow: "hidden",
           perspective: "2200px", perspectiveOrigin: "50% 50%",
           touchAction: "none", marginTop: 0, userSelect: "none",
+          transition: "height 0.6s ease",
         }}
       >
         <div
