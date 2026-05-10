@@ -9,6 +9,7 @@ import Navigation from "@/components/Navigation";
 import CustomCursor from "@/components/CustomCursor";
 import Preloader from "@/components/Preloader";
 import HookahModel from "@/components/HookahModel";
+import SmokeParticles from "@/components/SmokeParticles";
 import { useStore } from "@/store/useStore";
 import { useIsMobile } from "@/context/MobileContext";
 
@@ -55,12 +56,17 @@ function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: numbe
         position={isMobile ? [0, 0, 0] : [1.8, -0.3, 0]}
       />
 
-      {/* Magenta sparkles orbiting — desktop only */}
+      {/* Smoke + embers rising from bowl — bowl top at world Y≈1.5, X≈1.8 */}
+      {!isMobile && (
+        <SmokeParticles bowlY={1.52} bowlX={1.8} bowlZ={0} radius={0.07} />
+      )}
+
+      {/* Sparkles orbiting — desktop only */}
       {!isMobile && (
         <>
-          <Sparkles count={100} scale={[3, 5, 3]} size={2}   speed={0.2} color="#e879f9" opacity={0.5} position={[1.2, 0, 0]} />
-          <Sparkles count={60}  scale={[4, 6, 4]} size={1.5} speed={0.12} color="#06b6d4" opacity={0.4} position={[1.2, 0.5, 0]} />
-          <Sparkles count={30}  scale={[2, 3, 2]} size={3}   speed={0.35} color="#f59e0b" opacity={0.6} position={[1.2, 1, 0]} />
+          <Sparkles count={80}  scale={[3, 5, 3]} size={1.8} speed={0.18} color="#e879f9" opacity={0.45} position={[1.8, 0, 0]} />
+          <Sparkles count={50}  scale={[4, 6, 4]} size={1.4} speed={0.10} color="#06b6d4" opacity={0.35} position={[1.8, 0.5, 0]} />
+          <Sparkles count={25}  scale={[2, 3, 2]} size={2.5} speed={0.30} color="#f59e0b" opacity={0.55} position={[1.8, 1.2, 0]} />
         </>
       )}
 

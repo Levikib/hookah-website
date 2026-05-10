@@ -48,9 +48,9 @@ export default function HookahModel({
   useFrame((_, delta) => {
     if (!groupRef.current) return;
 
-    // Smooth mouse parallax
-    rotX.current += (mouseY * -0.18 - rotX.current) * 0.055;
-    rotY.current += (mouseX *  0.22 - rotY.current) * 0.055;
+    // Smooth mouse parallax — wide rotation range for full 3D feel
+    rotX.current += (mouseY * -0.5 - rotX.current) * 0.04;
+    rotY.current += (mouseX *  0.7 - rotY.current) * 0.04;
     groupRef.current.rotation.x = rotX.current;
     groupRef.current.rotation.y = rotY.current;
 
