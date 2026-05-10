@@ -1,44 +1,103 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import dynamic from "next/dynamic";
+import { Canvas } from "@react-three/fiber";
+import { Environment, ContactShadows, Sparkles } from "@react-three/drei";
 import Navigation from "@/components/Navigation";
 import CustomCursor from "@/components/CustomCursor";
 import Preloader from "@/components/Preloader";
+import HookahModel from "@/components/HookahModel";
 import { useStore } from "@/store/useStore";
 import { useIsMobile } from "@/context/MobileContext";
 
-// Spline components — SSR off (canvas APIs unavailable server-side)
-const SplineHero        = dynamic(() => import("@/components/SplineHero"),        { ssr: false });
 const SplineDisassembly = dynamic(() => import("@/components/SplineDisassembly"), { ssr: false });
-
-// Rest of sections
-const FlavourWall    = dynamic(() => import("@/components/FlavourWall"),    { ssr: false });
+const FlavourWall     = dynamic(() => import("@/components/FlavourWall"),     { ssr: false });
 const SessionsSection = dynamic(() => import("@/components/SessionsSection"), { ssr: false });
 const RentalsSection  = dynamic(() => import("@/components/RentalsSection"),  { ssr: false });
-const FlavourShop    = dynamic(() => import("@/components/FlavourShop"),    { ssr: false });
-const PackageWizard  = dynamic(() => import("@/components/PackageWizard"),  { ssr: false });
-const Footer         = dynamic(() => import("@/components/Footer"),         { ssr: false });
-const BookingModal   = dynamic(() => import("@/components/BookingModal"),   { ssr: false });
-const CartDrawer     = dynamic(() => import("@/components/CartDrawer"),     { ssr: false });
+const FlavourShop     = dynamic(() => import("@/components/FlavourShop"),     { ssr: false });
+const PackageWizard   = dynamic(() => import("@/components/PackageWizard"),   { ssr: false });
+const Footer          = dynamic(() => import("@/components/Footer"),          { ssr: false });
+const BookingModal    = dynamic(() => import("@/components/BookingModal"),    { ssr: false });
+const CartDrawer      = dynamic(() => import("@/components/CartDrawer"),      { ssr: false });
 
 gsap.registerPlugin(ScrollTrigger);
+
+function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: number; isMobile: boolean }) {
+  return (
+    <>
+      {/* Ambient base */}
+      <ambientLight intensity={0.3} />
+
+      {/* Key light — warm white from top-left */}
+      <pointLight position={[-3, 6, 4]}  intensity={12} color="#fff8f0" />
+
+      {/* Cyan fill — right side, lights up teal glass beautifully */}
+      <pointLight position={[4, 2, 3]}   intensity={18} color="#06b6d4" />
+
+      {/* Violet rim — back left, gives the brass a purple edge glow */}
+      <pointLight position={[-4, 0, -3]} intensity={10} color="#7c3aed" />
+
+      {/* Gold under-light — makes the base glow upward */}
+      <pointLight position={[0, -3, 2]}  intensity={8}  color="#f59e0b" />
+
+      {/* Magenta accent — upper right pop */}
+      <pointLight position={[3, 5, -2]}  intensity={6}  color="#e879f9" />
+
+      {/* IBL environment for PBR reflections — studio preset */}
+      <Environment preset="studio" />
+
+      <HookahModel
+        mouseX={mouseX}
+        mouseY={mouseY}
+        scale={isMobile ? 0.28 : 0.38}
+        position={isMobile ? [0, -0.6, 0] : [1.2, -0.9, 0]}
+      />
+
+      {/* Magenta sparkles orbiting — desktop only */}
+      {!isMobile && (
+        <>
+          <Sparkles count={100} scale={[3, 5, 3]} size={2}   speed={0.2} color="#e879f9" opacity={0.5} position={[1.2, 0, 0]} />
+          <Sparkles count={60}  scale={[4, 6, 4]} size={1.5} speed={0.12} color="#06b6d4" opacity={0.4} position={[1.2, 0.5, 0]} />
+          <Sparkles count={30}  scale={[2, 3, 2]} size={3}   speed={0.35} color="#f59e0b" opacity={0.6} position={[1.2, 1, 0]} />
+        </>
+      )}
+
+      <ContactShadows
+        position={[1.0, -1.6, 0]}
+        opacity={0.5}
+        scale={5}
+        blur={2.5}
+        color="#06b6d4"
+      />
+    </>
+  );
+}
 
 export default function Home() {
   const { setBookingOpen } = useStore();
   const [preloaderDone, setPreloaderDone] = useState(false);
+  const [mouse, setMouse]   = useState({ x: 0, y: 0 });
   const [scrolled, setScrolled] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const isMobile = useIsMobile();
+  const [mounted, setMounted]   = useState(false);
+  const isMobile    = useIsMobile();
   const heroFrameRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
+    const onMove  = (e: MouseEvent) => setMouse({
+      x: (e.clientX / window.innerWidth)  * 2 - 1,
+      y: (e.clientY / window.innerHeight) * 2 - 1,
+    });
     const onScroll = () => setScrolled(window.scrollY > 60);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener("mousemove", onMove,   { passive: true });
+    window.addEventListener("scroll",    onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("scroll",    onScroll);
+    };
   }, []);
 
   // Clip-path morph on hero scroll (Zentry-style)
@@ -118,10 +177,20 @@ export default function Home() {
           }} />
         </div>
 
-        {/* Spline 3D scene — fills hero, mouse-reactive */}
-        {mounted && !isMobile && (
+        {/* R3F canvas — Meshy GLB hookah, mouse parallax, neon lights */}
+        {mounted && (
           <div style={{ position: "absolute", inset: 0, zIndex: 1 }}>
-            <SplineHero onLoad={() => setPreloaderDone(true)} />
+            <Canvas
+              camera={{ position: [0, 0.5, 6], fov: 50 }}
+              dpr={isMobile ? [1, 1] : [1, 1.5]}
+              gl={{ alpha: true, antialias: true, toneMapping: 4 }}
+              style={{ background: "transparent" }}
+              onCreated={() => setPreloaderDone(true)}
+            >
+              <Suspense fallback={null}>
+                <HeroScene mouseX={mouse.x} mouseY={mouse.y} isMobile={isMobile} />
+              </Suspense>
+            </Canvas>
           </div>
         )}
 

@@ -1,96 +1,67 @@
 "use client";
-import { useRef } from "react";
+import { useRef, useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-// Tell drei's GLTFLoader where to find the Draco decoder
-useGLTF.setDecoderPath("/draco/");
-
-export const HOOKAH_PARTS = [
-  "hookah_plate",
-  "hookah_shaft",
-  "hookah_hose_port",
-  "hookah_mouthpiece",
-  "hookah_base",
-  "hookah_bowl",
-  "hookah_hose",
-] as const;
-
-export const EXPLODE_OFFSETS: Record<string, [number, number, number]> = {
-  hookah_plate:    [-2.2, -0.8, 0],
-  hookah_shaft:    [0,     2.0, 0],
-  hookah_hose_port:[2.2,   0.4, 0],
-  hookah_mouthpiece:[2.4,  1.6, 0],
-  hookah_base:     [-2.4, -1.6, 0],
-  hookah_bowl:     [0,     2.8, 0],
-  hookah_hose:     [-2.6,  0.8, 0],
-};
-
 interface HookahModelProps {
-  explode?: number;
   mouseX?: number;
   mouseY?: number;
   scale?: number;
   position?: [number, number, number];
+  explode?: number; // 0 = assembled, 1 = fully exploded (future use)
 }
 
 export default function HookahModel({
-  explode = 0,
   mouseX = 0,
   mouseY = 0,
   scale = 1,
   position = [0, 0, 0],
 }: HookahModelProps) {
-  const groupRef = useRef<THREE.Group>(null!);
-  const partRefs = useRef<Record<string, THREE.Object3D>>({});
+  const groupRef  = useRef<THREE.Group>(null!);
+  const rotX      = useRef(0);
+  const rotY      = useRef(0);
+  const floatT    = useRef(0);
 
-  const gltf = useGLTF("/models/hookah.glb");
-  const nodes = gltf.nodes as Record<string, THREE.Mesh>;
+  const { scene } = useGLTF("/models/hookah.glb");
 
-  const targetRotX = useRef(0);
-  const targetRotY = useRef(0);
+  // Clone so multiple instances don't share state
+  const cloned = useMemo(() => {
+    const c = scene.clone(true);
+    // Enable shadows and smooth normals on every mesh
+    c.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        const mesh = obj as THREE.Mesh;
+        mesh.castShadow    = true;
+        mesh.receiveShadow = true;
+        // Ensure PBR material renders correctly
+        if (mesh.material) {
+          const mat = mesh.material as THREE.MeshStandardMaterial;
+          mat.envMapIntensity = 1.2;
+          mat.needsUpdate = true;
+        }
+      }
+    });
+    return c;
+  }, [scene]);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (!groupRef.current) return;
 
-    // Spring damping ~0.85 per frame toward mouse target
-    const stiffness = 0.06;
-    targetRotX.current += (mouseY * -0.14 - targetRotX.current) * stiffness;
-    targetRotY.current += (mouseX *  0.14 - targetRotY.current) * stiffness;
+    // Smooth mouse parallax
+    rotX.current += (mouseY * -0.18 - rotX.current) * 0.055;
+    rotY.current += (mouseX *  0.22 - rotY.current) * 0.055;
+    groupRef.current.rotation.x = rotX.current;
+    groupRef.current.rotation.y = rotY.current;
 
-    groupRef.current.rotation.x = targetRotX.current;
-    groupRef.current.rotation.y = targetRotY.current;
-
-    // Explode parts toward offset positions (0 = assembled, 1 = fully exploded)
-    for (const name of HOOKAH_PARTS) {
-      const obj = partRefs.current[name];
-      if (!obj) continue;
-      const [ex, ey, ez] = EXPLODE_OFFSETS[name];
-      obj.position.x += (ex * explode - obj.position.x) * 0.1;
-      obj.position.y += (ey * explode - obj.position.y) * 0.1;
-      obj.position.z += (ez * explode - obj.position.z) * 0.1;
-    }
+    // Gentle ambient float
+    floatT.current += delta * 0.6;
+    groupRef.current.position.y = position[1] + Math.sin(floatT.current) * 0.04;
   });
-
-  const renderPart = (name: string) => {
-    const node = nodes[name];
-    if (!node || !node.geometry) return null;
-    return (
-      <mesh
-        key={name}
-        ref={(el) => { if (el) partRefs.current[name] = el; }}
-        geometry={node.geometry}
-        material={node.material}
-        castShadow
-        receiveShadow
-      />
-    );
-  };
 
   return (
     <group ref={groupRef} scale={scale} position={position}>
-      {HOOKAH_PARTS.map(renderPart)}
+      <primitive object={cloned} />
     </group>
   );
 }
