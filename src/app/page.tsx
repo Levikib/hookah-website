@@ -12,7 +12,7 @@ import HookahModel from "@/components/HookahModel";
 import { useStore } from "@/store/useStore";
 import { useIsMobile } from "@/context/MobileContext";
 
-const SplineDisassembly = dynamic(() => import("@/components/SplineDisassembly"), { ssr: false });
+const DisassemblySection = dynamic(() => import("@/components/DisassemblySection"), { ssr: false });
 const FlavourWall     = dynamic(() => import("@/components/FlavourWall"),     { ssr: false });
 const SessionsSection = dynamic(() => import("@/components/SessionsSection"), { ssr: false });
 const RentalsSection  = dynamic(() => import("@/components/RentalsSection"),  { ssr: false });
@@ -51,8 +51,8 @@ function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: numbe
       <HookahModel
         mouseX={mouseX}
         mouseY={mouseY}
-        scale={isMobile ? 0.55 : 0.72}
-        position={isMobile ? [0, -0.4, 0] : [1.4, -0.6, 0]}
+        scale={isMobile ? 0.7 : 1.1}
+        position={isMobile ? [0, -0.2, 0] : [1.2, -0.5, 0]}
       />
 
       {/* Magenta sparkles orbiting — desktop only */}
@@ -336,9 +336,9 @@ export default function Home() {
       </section>
 
       {/* ══════════════════════════════════════════════════════════════
-          S2: DISASSEMBLY — Spline scene, GSAP scroll-scrubbed
+          S2: DISASSEMBLY
       ══════════════════════════════════════════════════════════════ */}
-      <SplineDisassembly />
+      <DisassemblySection />
 
       {/* ══════════════════════════════════════════════════════════════
           S3: FLAVOUR WALL — section id="flavours" is inside component
