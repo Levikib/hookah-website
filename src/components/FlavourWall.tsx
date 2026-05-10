@@ -304,19 +304,18 @@ function FlavourCard({ flavour, onSelect }, ref) {
       style={{
         width: CARD_W, height: CARD_H,
         position: "absolute", willChange: "transform",
-        transformStyle: "preserve-3d", cursor: "pointer", opacity: 0,
+        cursor: "pointer", opacity: 0,
       }}
     >
       <div
         style={{
           width: "100%", height: "100%",
-          background: "rgba(8,5,18,0.95)",
+          background: "#080512",
           border: `1px solid ${accent}33`,
           borderTop: `2px solid ${accent}`,
           borderRadius: 16, padding: "16px 14px 14px",
           display: "flex", flexDirection: "column", gap: 8,
           boxShadow: `0 0 20px ${accent}15, inset 0 1px 0 rgba(255,255,255,0.05)`,
-          backdropFilter: "blur(12px)",
           transition: "box-shadow 0.25s ease, border-color 0.25s ease",
           position: "relative", overflow: "hidden",
           opacity: stock === "out" ? 0.45 : 1,
@@ -448,17 +447,31 @@ function DesktopWall({
 
   useEffect(() => {
     let running = true;
+    let idle = false;
     const loop = () => {
       if (!running) return;
       rafOrbit.current = requestAnimationFrame(loop);
+
       if (!isDragging.current) {
         velRef.current.x *= 0.88;
         velRef.current.y *= 0.88;
         targetOrbitRef.current.x += velRef.current.x;
         targetOrbitRef.current.y += velRef.current.y;
       }
-      orbitRef.current.x += (targetOrbitRef.current.x - orbitRef.current.x) * 0.1;
-      orbitRef.current.y += (targetOrbitRef.current.y - orbitRef.current.y) * 0.1;
+
+      const dx = targetOrbitRef.current.x - orbitRef.current.x;
+      const dy = targetOrbitRef.current.y - orbitRef.current.y;
+      const speed = Math.abs(velRef.current.x) + Math.abs(velRef.current.y);
+
+      // Skip DOM write and go idle when nothing is moving
+      if (!isDragging.current && speed < 0.01 && Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) {
+        if (!idle) { idle = true; }
+        return;
+      }
+      idle = false;
+
+      orbitRef.current.x += dx * 0.1;
+      orbitRef.current.y += dy * 0.1;
       if (sceneRef.current) {
         sceneRef.current.style.transform = `rotateX(${orbitRef.current.x}deg) rotateY(${orbitRef.current.y}deg)`;
       }
@@ -474,24 +487,26 @@ function DesktopWall({
     const doMorph = () => {
       const plist = getPositions(next);
       const els = cardRefs.current;
-      els.forEach(el => { if (el) gsap.killTweensOf(el); });
-      els.forEach((el, i) => {
-        if (!el) return;
-        gsap.to(el, { scale: 0.001, opacity: 0, duration: 0.25, delay: i * 0.012, ease: "power2.in" });
+      const validEls = els.filter(Boolean) as HTMLDivElement[];
+      validEls.forEach(el => gsap.killTweensOf(el));
+
+      // Phase 1: collapse all at once with stagger via GSAP timeline
+      const tl = gsap.timeline({
+        onComplete: () => {
+          // Reposition all cards instantly while invisible
+          validEls.forEach((el, i) => {
+            const p = plist[els.indexOf(el)];
+            if (!p) return;
+            gsap.set(el, { x: p.x + OFFSET_X, y: p.y + OFFSET_Y, z: p.z, rotationX: p.rx, rotationY: p.ry, rotationZ: p.rz });
+          });
+          // Phase 2: reveal with stagger
+          gsap.to(validEls, {
+            scale: 1, opacity: 1, duration: 0.7, stagger: 0.01, ease: "power3.out",
+            onComplete: () => { currentLayout.current = next; setLayout(next); setMorphing(false); },
+          });
+        },
       });
-      const maxPhase1 = 0.25 + (els.length - 1) * 0.012;
-      const lastIdx = els.filter(Boolean).length - 1;
-      els.forEach((el, i) => {
-        if (!el || !plist[i]) return;
-        const p = plist[i];
-        gsap.delayedCall(maxPhase1 - 0.02, () => {
-          gsap.set(el, { x: p.x + OFFSET_X, y: p.y + OFFSET_Y, z: p.z, rotationX: p.rx, rotationY: p.ry, rotationZ: p.rz });
-        });
-        gsap.to(el, {
-          scale: 1, opacity: 1, duration: 1.0, delay: maxPhase1 + i * 0.012, ease: "power4.out",
-          onComplete: i === lastIdx ? () => { currentLayout.current = next; setLayout(next); setMorphing(false); } : undefined,
-        });
-      });
+      tl.to(validEls, { scale: 0.001, opacity: 0, duration: 0.2, stagger: 0.008, ease: "power2.in" });
     };
     if ((currentLayout.current === "SPHERE" && next === "HELIX") || (currentLayout.current === "HELIX" && next === "SPHERE")) {
       gsap.to(targetOrbitRef.current, { x: 0, y: 0, duration: 0.8, ease: "power3.out", onComplete: doMorph });
@@ -587,6 +602,7 @@ function DesktopWall({
           style={{
             position: "absolute", top: "50%", left: "50%",
             transformStyle: "preserve-3d", willChange: "transform",
+            contain: "layout style",
           }}
         >
           {FLAVOURS.map((f, i) => (
