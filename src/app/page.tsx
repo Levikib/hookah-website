@@ -51,8 +51,8 @@ function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: numbe
       <HookahModel
         mouseX={mouseX}
         mouseY={mouseY}
-        scale={isMobile ? 0.28 : 0.38}
-        position={isMobile ? [0, -0.6, 0] : [1.2, -0.9, 0]}
+        scale={isMobile ? 0.55 : 0.72}
+        position={isMobile ? [0, -0.4, 0] : [1.4, -0.6, 0]}
       />
 
       {/* Magenta sparkles orbiting — desktop only */}
@@ -181,7 +181,7 @@ export default function Home() {
         {mounted && (
           <div style={{ position: "absolute", inset: 0, zIndex: 1 }}>
             <Canvas
-              camera={{ position: [0, 0.5, 6], fov: 50 }}
+              camera={{ position: [0, 0.5, 5], fov: 52 }}
               dpr={isMobile ? [1, 1] : [1, 1.5]}
               gl={{ alpha: true, antialias: true, toneMapping: 4 }}
               style={{ background: "transparent" }}
@@ -205,9 +205,10 @@ export default function Home() {
         {/* Hero content */}
         <div style={{
           position: "relative", zIndex: 20,
-          maxWidth: isMobile ? "100%" : 560,
+          maxWidth: isMobile ? "100%" : 580,
           padding: isMobile ? "0 6vw" : "0 7vw",
           display: "flex", flexDirection: "column", gap: 0,
+          paddingTop: isMobile ? 100 : 120,
         }}>
 
           {/* Tag */}
@@ -217,25 +218,25 @@ export default function Home() {
             letterSpacing: "0.28em",
             textTransform: "uppercase",
             color: "var(--cyan-bright)",
-            marginBottom: 20,
+            marginBottom: 24,
             opacity: 0.85,
           }}>
-            Est. 2024 · Premium Hookah
+            Est. 2026 · Premium Hookah
           </p>
 
-          {/* Headline — 2 lines */}
+          {/* Headline — 2 lines with clear break */}
           <h1 style={{
             fontFamily: "var(--font-bebas)",
             fontWeight: 400,
-            fontSize: isMobile ? "clamp(44px, 12vw, 72px)" : "clamp(64px, 7vw, 100px)",
-            lineHeight: 1.0,
+            fontSize: isMobile ? "clamp(52px, 13vw, 80px)" : "clamp(72px, 8vw, 112px)",
+            lineHeight: 0.95,
             letterSpacing: "0.04em",
             textTransform: "uppercase",
             color: "#ffffff",
-            marginBottom: 28,
+            marginBottom: 32,
           }}>
-            The Session Starts<br />
-            <span style={{ color: "var(--cyan-bright)" }}>Here.</span>
+            The Session<br />
+            Starts <span style={{ color: "var(--cyan-bright)" }}>Here.</span>
           </h1>
 
           {/* Subtext */}
