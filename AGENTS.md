@@ -18,6 +18,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | Animation | GSAP 3.15 + ScrollTrigger |
 | 3D | React Three Fiber + Three.js (Hero only) |
 | State | Zustand (`src/store/useStore.ts`) |
+| Database | Supabase (connected — `@supabase/supabase-js` installed) |
+| Payments | Paystack (live keys in `.env.local`) |
+| Email | Resend API (native fetch, no SDK) |
 | Fonts | Bebas Neue, Barlow Condensed, Inter, Space Mono, Cormorant Garamond |
 | Styling | Inline styles + `globals.css` design tokens |
 | Deploy | Vercel (prod alias: `hookah-website-two.vercel.app`) |
@@ -93,6 +96,7 @@ Global overlays (always mounted): `NavAndCart` (= Navigation + CartDrawer + Cust
 - `useIsMobile()` for layout switching (1-col mobile, 2-col desktop)
 - Calendar built from scratch (no external lib)
 - Delivery fee: KES 2,000
+- Step 4 (Review) hits `POST /api/paystack/initialize`, then redirects to `window.location.href = authorization_url` (Paystack-hosted checkout)
 
 ### `FlavourWall`
 - CSS3D sphere/helix of 36 flavour cards
@@ -142,14 +146,94 @@ CartItem.type: "flavour" | "rental" | "session" | "addon"
 
 Key actions: `addToCart`, `removeFromCart`, `updateQuantity`, `clearCart`, `setCartOpen`, `setBookingOpen`.
 
+## Lib Files (`src/lib/`)
+
+| File | Purpose |
+|---|---|
+| `supabase.ts` | `createClient()` (anon/RLS) and `createServiceClient()` (service role). Full `Database` type definitions for all tables. |
+| `paystack.ts` | `initializePayment()`, `verifyPayment()`. All amounts in kobo (KES × 100). Includes `InitializePaymentParams`, `PaystackTransactionData` types. |
+| `email.ts` | `sendBookingConfirmation()`, `sendOrderConfirmation()`. Resend API via native fetch. Branded HTML email templates matching design system. |
+| `adminAuth.ts` | Cookie-based admin session: `ADMIN_PASSWORD` + `ADMIN_SECRET` env vars. |
+
+## API Routes
+
+### Public
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/paystack/initialize` | POST | Creates pending booking in Supabase, returns `{ authorization_url, reference }` |
+| `/api/paystack/verify` | POST | Verifies payment by reference, marks booking confirmed, sends email |
+| `/api/paystack/webhook` | POST | Paystack webhook (HMAC-SHA512 validated). Handles `charge.success` idempotently |
+| `/api/orders` | POST/GET | Create/list flavour shop orders |
+| `/api/inventory` | GET | Public inventory levels |
+
+### Admin (cookie-authenticated)
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/admin/auth` | POST | Login — validates password, sets session cookie |
+| `/api/admin/logout` | POST | Clears session cookie |
+| `/api/admin/staff` | GET/POST/PATCH/DELETE | Staff CRUD + assigned bookings |
+| `/api/admin/bookings/[id]/status` | PATCH | Update booking status |
+| `/api/admin/bookings/[id]/staff` | PATCH | Assign staff member to booking |
+| `/api/admin/orders/[id]/status` | PATCH | Update order status |
+| `/api/admin/orders/[id]/delivery` | POST | Add delivery event |
+| `/api/admin/inventory` | GET/PATCH | Read/update inventory stock levels |
+
+## Supabase Schema
+
+Tables defined in `src/lib/supabase.ts` (TypeScript type definitions — must be mirrored in Supabase dashboard):
+
+| Table | Key columns |
+|---|---|
+| `customers` | `id`, `email`, `name`, `phone` |
+| `bookings` | `id`, `customer_id`, `session_id`, `session_name`, `booking_date`, `time_slot`, `status`, `total_kobo`, `paystack_reference`, `notes` |
+| `booking_flavours` | `booking_id`, `flavour_id`, `quantity` |
+| `orders` | `id`, `customer_id`, `status`, `total_kobo`, `delivery_address`, `paystack_reference` |
+| `order_items` | `order_id`, `flavour_id`, `size`, `quantity`, `unit_price_kobo` |
+| `inventory` | `flavour_id`, `stock_50g`, `stock_100g`, `stock_250g` |
+| `delivery_events` | `order_id`, `status`, `description`, `location` |
+| `staff` | `id`, `name`, `phone`, `email`, `area`, `active`, `avatar_emoji`, `booking_count` |
+
+## Admin Dashboard (`/admin`)
+
+Protected by cookie session (`ADMIN_PASSWORD` / `ADMIN_SECRET`). Login at `/admin-login`.
+
+| Page | Route | Description |
+|---|---|---|
+| Dashboard | `/admin` | KPI cards (bookings, revenue, orders, staff), recent bookings/orders table, low-stock alerts |
+| Bookings | `/admin/bookings` | Filterable list with status badges; status update actions |
+| Booking Detail | `/admin/bookings/[id]` | Full booking view, staff assignment, status history |
+| Orders | `/admin/orders` | Filterable order list |
+| Order Detail | `/admin/orders/[id]` | Full order, delivery event timeline, status update |
+| Inventory | `/admin/inventory` | Stock levels per flavour/size; inline PATCH to update |
+| Staff | `/admin/staff` | CRUD for staff members; toggle active; view assigned bookings |
+| Analytics | `/admin/analytics` | 6-month revenue chart, session breakdown, order status breakdown, top inventory |
+| Settings | `/admin/settings` | Site config (read/write Supabase `settings` table) |
+
+## Payment Flow (end-to-end)
+
+1. User completes BookingModal steps 1–3
+2. Step 4 Review → "Confirm & Pay" → `POST /api/paystack/initialize` → returns `authorization_url`
+3. `window.location.href = authorization_url` → user pays on Paystack-hosted page
+4. Paystack redirects to `/booking/confirm?reference=xxx` (callback_url)
+5. Confirm page calls `POST /api/paystack/verify` → marks booking confirmed → sends email
+6. Simultaneously, Paystack fires webhook to `/api/paystack/webhook` (idempotent, HMAC-validated)
+
+## Email System
+
+Sent from: `bookings@hkh.co` via Resend API.
+
+- `sendBookingConfirmation()` — triggered by `/api/paystack/verify` on success
+- `sendOrderConfirmation()` — triggered by `/api/orders` POST on payment success
+- HTML templates use the same design tokens (violet gradient header, dark bg, electric yellow totals)
+
 ## Pending / Next Steps
 
-1. **Hero section** — Replace 3D model with AI-generated video (Kling/Luma/Runway) or wire Spline scene
-2. **Supabase backend** — Schema: `orders`, `bookings`, `customers`, `inventory`, `delivery_events`
-3. **Paystack integration** — API routes: `/api/paystack/initialize`, `/api/paystack/verify`, `/api/paystack/webhook`
-4. **Email confirmations** — Resend/Nodemailer for booking confirmed, order received, delivery update
-5. **Full checkout flow** — Connect BookingModal "Confirm" to real payment API
-6. **Delivery tracking** — Real-time status updates
+1. **Supabase SQL** — Run the schema SQL in the Supabase SQL editor to create all tables (TypeScript types are defined; actual DB tables must be created manually)
+2. **Hero section** — Replace 3D placeholder with AI-generated video (Kling/Luma/Runway) or wire Spline scene
+3. **Email domain** — Verify `hkh.co` sending domain in Resend dashboard so `bookings@hkh.co` works
+4. **Orders checkout** — FlavourShop `JarModal` CTA currently adds to cart; wire full Paystack flow for flavour orders (similar to booking flow)
+5. **Delivery tracking** — Real-time status updates on order detail page
+6. **Paystack webhook URL** — Register `https://hookah-website-two.vercel.app/api/paystack/webhook` in Paystack dashboard
 
 ## Development Commands
 

@@ -51,7 +51,7 @@ interface Pos { x: number; y: number; z: number; rx: number; ry: number; rz: num
 
 function spherePos(): Pos[] {
   const N = FLAVOURS.length;
-  const R = 500;
+  const R = 440;
   return FLAVOURS.map((_, i) => {
     const phi   = Math.acos(1 - (2 * (i + 0.5)) / N);
     const theta = Math.PI * (1 + Math.sqrt(5)) * i;
@@ -554,9 +554,9 @@ function DesktopWall({
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
         style={{
-          position: "relative", zIndex: 5, width: "100%", height: 1100,
-          overflow: "hidden",
-          perspective: "1400px", perspectiveOrigin: "50% 50%",
+          position: "relative", zIndex: 5, width: "100%", height: 1300,
+          overflow: "visible",
+          perspective: "2200px", perspectiveOrigin: "50% 50%",
           touchAction: "none", marginTop: 0, userSelect: "none",
         }}
       >
@@ -578,7 +578,7 @@ function DesktopWall({
         </div>
       </div>
 
-      <p style={{ textAlign: "center", padding: "12px 0 clamp(40px,5vw,64px)", fontFamily: "var(--font-mono)", fontSize: 9, color: "rgba(255,255,255,0.16)", letterSpacing: "0.16em", textTransform: "uppercase" }}>
+      <p style={{ textAlign: "center", padding: "28px 0 clamp(16px,3vw,32px)", fontFamily: "var(--font-mono)", fontSize: 9, color: "rgba(255,255,255,0.16)", letterSpacing: "0.16em", textTransform: "uppercase" }}>
         {category === "All" ? FLAVOURS.length : FLAVOURS.filter(f => f.category === category).length} blends · {layout.toLowerCase()} view
         {morphing && " · morphing..."}
       </p>
@@ -635,7 +635,8 @@ export default function FlavourWall() {
         position: "relative",
         overflow: "hidden",
         // Critical: do NOT set minHeight on mobile — let content determine height
-        minHeight: isMobile ? "auto" : "100vh",
+        minHeight: isMobile ? "auto" : "auto",
+        paddingBottom: isMobile ? 0 : "clamp(60px,8vw,120px)",
       }}
     >
       {/* Nebula bg */}
