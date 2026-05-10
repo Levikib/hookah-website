@@ -1,10 +1,10 @@
 "use client";
 import { useRef, useEffect, useState, Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
-import { ContactShadows } from "@react-three/drei";
+import { ContactShadows, Environment } from "@react-three/drei";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import HookahModel from "./HookahModel";
+import ExplodeHookah from "./ExplodeHookah";
 import SmokeParticles from "./SmokeParticles";
 import { useIsMobile } from "@/context/MobileContext";
 
@@ -148,7 +148,7 @@ export default function DisassemblySection() {
     return () => ctx.revert();
   }, [isMobile]);
 
-  const cameraProps = { position: [0, 1.2, 5] as [number, number, number], fov: 38 };
+  const cameraProps = { position: [0, 0.2, 5.5] as [number, number, number], fov: 52 };
 
   if (isMobile) return <MobileDisassembly />;
 
@@ -215,22 +215,32 @@ export default function DisassemblySection() {
             style={{ background: "transparent" }}
           >
             <Suspense fallback={null}>
-              <ambientLight intensity={0.4} />
-              <pointLight position={[4, 5, 4]} intensity={4} color="#ffd700" />
-              <pointLight position={[-4, 3, -3]} intensity={2.5} color="#00f5d4" />
-              <pointLight position={[0, -3, 4]} intensity={1.5} color="#9d4edd" />
-              <HookahModel
-                explode={explode}
-                scale={1.0}
-                position={[0, -1.6, 0]}
+              <ambientLight intensity={0.25} />
+              <pointLight position={[-3, 6, 4]}  intensity={14} color="#fff8f0" />
+              <pointLight position={[4, 2, 3]}   intensity={20} color="#06b6d4" />
+              <pointLight position={[-4, 0, -3]} intensity={12} color="#7c3aed" />
+              <pointLight position={[0, -3, 2]}  intensity={8}  color="#f59e0b" />
+              <pointLight position={[3, 5, -2]}  intensity={6}  color="#e879f9" />
+              <Environment preset="studio" />
+              <ExplodeHookah
+                progress={explode}
+                scale={1.4}
+                position={[0, -0.6, 0]}
               />
-              {!isMobile && <SmokeParticles bowlY={explode > 0.1 ? 99 : 1.65} />}
+              {!isMobile && (
+                <SmokeParticles
+                  bowlY={explode > 0.05 ? 99 : 0.74}
+                  bowlX={0}
+                  bowlZ={0}
+                  radius={0.09}
+                />
+              )}
               <ContactShadows
                 position={[0, -1.62, 0]}
-                opacity={Math.max(0, 0.3 - explode * 0.3)}
-                scale={3}
-                blur={3}
-                color="#00f5d4"
+                opacity={Math.max(0, 0.4 - explode * 0.4)}
+                scale={4}
+                blur={2.5}
+                color="#06b6d4"
               />
             </Suspense>
           </Canvas>
