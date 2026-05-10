@@ -51,8 +51,8 @@ function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: numbe
       <HookahModel
         mouseX={mouseX}
         mouseY={mouseY}
-        scale={isMobile ? 0.7 : 1.1}
-        position={isMobile ? [0, -0.2, 0] : [1.2, -0.5, 0]}
+        scale={isMobile ? 0.9 : 1.9}
+        position={isMobile ? [0, 0, 0] : [1.6, 0.2, 0]}
       />
 
       {/* Magenta sparkles orbiting — desktop only */}
@@ -181,7 +181,7 @@ export default function Home() {
         {mounted && (
           <div style={{ position: "absolute", inset: 0, zIndex: 1 }}>
             <Canvas
-              camera={{ position: [0, 0.5, 5], fov: 52 }}
+              camera={{ position: [0, 0.5, 4.2], fov: 55 }}
               dpr={isMobile ? [1, 1] : [1, 1.5]}
               gl={{ alpha: true, antialias: true, toneMapping: 4 }}
               style={{ background: "transparent" }}
