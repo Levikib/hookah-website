@@ -66,18 +66,38 @@ function spherePos(): Pos[] {
 
 function helixPos(): Pos[] {
   const N = FLAVOURS.length;
-  const R = 300;
-  const H = 1400;
-  return FLAVOURS.map((_, i) => {
-    const strand = i % 2 === 0 ? 1 : -1;
-    const t = i / (N - 1);
-    const angle = t * Math.PI * 5 * strand;
+  const R = 340;
+  const H = 1600;
+  // Split into two independent strands, each with its own index sequence
+  const strandA: number[] = [];
+  const strandB: number[] = [];
+  for (let i = 0; i < N; i++) {
+    if (i % 2 === 0) strandA.push(i); else strandB.push(i);
+  }
+  const nA = strandA.length;
+  const nB = strandB.length;
+  const result: Pos[] = new Array(N);
+  const turns = 3.5;
+  strandA.forEach((globalIdx, si) => {
+    const t = si / (nA - 1);
+    const angle = t * Math.PI * 2 * turns;
     const x = Math.cos(angle) * R;
     const z = Math.sin(angle) * R;
     const y = (t - 0.5) * -H;
     const ry = -angle * (180 / Math.PI);
-    return { x, y, z, rx: 0, ry, rz: 0 };
+    result[globalIdx] = { x, y, z, rx: 0, ry, rz: 0 };
   });
+  strandB.forEach((globalIdx, si) => {
+    const t = si / (nB - 1);
+    // Offset by half a turn so strands interleave
+    const angle = t * Math.PI * 2 * turns + Math.PI;
+    const x = Math.cos(angle) * R;
+    const z = Math.sin(angle) * R;
+    const y = (t - 0.5) * -H;
+    const ry = -angle * (180 / Math.PI);
+    result[globalIdx] = { x, y, z, rx: 0, ry, rz: 0 };
+  });
+  return result;
 }
 
 function getPositions(layout: Layout): Pos[] {
