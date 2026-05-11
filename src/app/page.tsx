@@ -13,7 +13,6 @@ import SmokeParticles from "@/components/SmokeParticles";
 import { useStore } from "@/store/useStore";
 import { useIsMobile } from "@/context/MobileContext";
 
-const CursorCharacter   = dynamic(() => import("@/components/CursorCharacter"),   { ssr: false });
 const DisassemblySection = dynamic(() => import("@/components/DisassemblySection"), { ssr: false });
 const FlavourWall     = dynamic(() => import("@/components/FlavourWall"),     { ssr: false });
 const SessionsSection = dynamic(() => import("@/components/SessionsSection"), { ssr: false });
@@ -136,7 +135,6 @@ export default function Home() {
       {!preloaderDone && <Preloader onComplete={() => setPreloaderDone(true)} />}
       <Navigation />
       <CustomCursor />
-      <CursorCharacter />
 
       {/* ══════════════════════════════════════════════════════════════
           HERO — full viewport, nebula background, 3D hookah
