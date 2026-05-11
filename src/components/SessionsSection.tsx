@@ -1,38 +1,54 @@
 "use client";
 import React, {
-  useRef, useEffect, useState, useCallback, memo,
+  useRef, useEffect, useState, useCallback, memo, Suspense,
 } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { useGLTF, Environment, Float } from "@react-three/drei";
 import { gsap } from "gsap";
+import * as THREE from "three";
 import { SESSIONS, type SessionTier } from "@/data/sessions";
 import { useStore } from "@/store/useStore";
 import { useIsMobile } from "@/context/MobileContext";
 
 function kes(n: number) { return `KES ${n.toLocaleString("en-KE")}`; }
 
-// ─── Per-session door personality ────────────────────────────────────────────
+// ─── Door metadata ────────────────────────────────────────────────────────────
 const DOOR_META: Record<string, {
   lightColor: string;
   glowColor: string;
-  wallPos: "left" | "right";
-  doorStyle: "narrow" | "wide" | "double" | "arch" | "steel" | "grand" | "exit" | "custom";
-  bulbColor: string;
+  model: string;
   ambientText: string;
+  floorGlow: string;
 }> = {
-  solo:      { lightColor: "#f59e0b", glowColor: "rgba(245,158,11,",  wallPos: "left",  doorStyle: "narrow", bulbColor: "#f6c90e", ambientText: "single · still" },
-  duo:       { lightColor: "#68d391", glowColor: "rgba(104,211,145,", wallPos: "left",  doorStyle: "wide",   bulbColor: "#68d391", ambientText: "close · quiet" },
-  squad:     { lightColor: "#22d3ee", glowColor: "rgba(34,211,238,",  wallPos: "left",  doorStyle: "double", bulbColor: "#22d3ee", ambientText: "loud · alive" },
-  vip:       { lightColor: "#f6c90e", glowColor: "rgba(246,201,14,",  wallPos: "left",  doorStyle: "arch",   bulbColor: "#ffd700", ambientText: "gold · hushed" },
-  rooftop:   { lightColor: "#b794f4", glowColor: "rgba(183,148,244,", wallPos: "right", doorStyle: "exit",   bulbColor: "#c4b5fd", ambientText: "open · infinite" },
-  corporate: { lightColor: "#63b3ed", glowColor: "rgba(99,179,237,",  wallPos: "right", doorStyle: "steel",  bulbColor: "#93c5fd", ambientText: "sharp · wired" },
-  wedding:   { lightColor: "#f687b3", glowColor: "rgba(246,135,179,", wallPos: "right", doorStyle: "grand",  bulbColor: "#f9a8d4", ambientText: "forever · full" },
-  custom:    { lightColor: "#ff6b35", glowColor: "rgba(255,107,53,",  wallPos: "right", doorStyle: "custom", bulbColor: "#ff6b35", ambientText: "anything · yours" },
+  solo:      { lightColor: "#f59e0b", glowColor: "#f59e0b", model: "/models/door_solo.glb",      ambientText: "single · still",    floorGlow: "rgba(245,158,11,0.35)" },
+  duo:       { lightColor: "#68d391", glowColor: "#68d391", model: "/models/door_duo.glb",       ambientText: "close · quiet",     floorGlow: "rgba(104,211,145,0.35)" },
+  squad:     { lightColor: "#22d3ee", glowColor: "#22d3ee", model: "/models/door_squad.glb",     ambientText: "loud · alive",      floorGlow: "rgba(34,211,238,0.35)" },
+  vip:       { lightColor: "#f6c90e", glowColor: "#f6c90e", model: "/models/door_vip.glb",       ambientText: "gold · hushed",     floorGlow: "rgba(246,201,14,0.35)" },
+  rooftop:   { lightColor: "#b794f4", glowColor: "#b794f4", model: "/models/door_rooftop.glb",   ambientText: "open · infinite",   floorGlow: "rgba(183,148,244,0.35)" },
+  corporate: { lightColor: "#63b3ed", glowColor: "#63b3ed", model: "/models/door_corporate.glb", ambientText: "sharp · wired",     floorGlow: "rgba(99,179,237,0.35)" },
+  wedding:   { lightColor: "#f687b3", glowColor: "#f687b3", model: "/models/door_wedding.glb",   ambientText: "forever · full",    floorGlow: "rgba(246,135,179,0.35)" },
+  custom:    { lightColor: "#ff6b35", glowColor: "#ff6b35", model: "/models/door_custom.glb",    ambientText: "anything · yours",  floorGlow: "rgba(255,107,53,0.35)" },
+};
+
+// Layout: 4 doors per row, 2 rows
+// Row 1 (back): solo, duo, squad, vip   — z = -3
+// Row 2 (front): rooftop, corporate, wedding, custom — z = 0
+const DOOR_POSITIONS: Record<string, [number, number, number]> = {
+  solo:      [-5.25, 0, -3],
+  duo:       [-1.75, 0, -3],
+  squad:     [ 1.75, 0, -3],
+  vip:       [ 5.25, 0, -3],
+  rooftop:   [-5.25, 0,  0],
+  corporate: [-1.75, 0,  0],
+  wedding:   [ 1.75, 0,  0],
+  custom:    [ 5.25, 0,  0],
 };
 
 // ─── Session Modal ────────────────────────────────────────────────────────────
 const SessionModal = memo(function SessionModal({
   session, onClose, onBook,
 }: { session: SessionTier; onClose: () => void; onBook: (s: SessionTier) => void }) {
-  const meta    = DOOR_META[session.id] ?? DOOR_META.solo;
+  const meta = DOOR_META[session.id] ?? DOOR_META.solo;
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef   = useRef<HTMLDivElement>(null);
 
@@ -53,14 +69,12 @@ const SessionModal = memo(function SessionModal({
         width: "min(640px,100%)", background: "linear-gradient(160deg,#0d0920,#08041a)",
         border: `1px solid ${meta.lightColor}44`, borderTop: `3px solid ${meta.lightColor}`,
         borderRadius: 20, overflow: "hidden", position: "relative",
-        boxShadow: `0 0 80px ${meta.glowColor}0.2), 0 40px 100px rgba(0,0,0,0.9)`,
+        boxShadow: `0 0 80px ${meta.lightColor}33, 0 40px 100px rgba(0,0,0,0.9)`,
       }}>
-        {/* Header */}
         <div style={{
           padding: "32px 28px 24px",
-          background: `linear-gradient(135deg, ${meta.glowColor}0.12) 0%, transparent 60%)`,
-          borderBottom: `1px solid rgba(255,255,255,0.06)`,
-          position: "relative",
+          background: `linear-gradient(135deg, ${meta.lightColor}18 0%, transparent 60%)`,
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
         }}>
           <button onClick={close} style={{
             position: "absolute", top: 16, right: 16, width: 44, height: 44, borderRadius: "50%",
@@ -68,27 +82,16 @@ const SessionModal = memo(function SessionModal({
             color: "rgba(255,255,255,0.6)", fontSize: 20, cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>×</button>
-
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
             <span style={{ fontSize: 42, filter: `drop-shadow(0 0 12px ${meta.lightColor})` }}>{session.emoji}</span>
             <div>
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.22em", color: meta.lightColor, textTransform: "uppercase", marginBottom: 4, opacity: 0.8 }}>
-                {meta.ambientText}
-              </p>
-              <h2 style={{ fontFamily: "var(--font-bebas)", fontSize: "clamp(28px,5vw,44px)", color: "#fff", letterSpacing: "0.04em", lineHeight: 1 }}>
-                {session.name}
-              </h2>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.22em", color: meta.lightColor, textTransform: "uppercase", marginBottom: 4, opacity: 0.8 }}>{meta.ambientText}</p>
+              <h2 style={{ fontFamily: "var(--font-bebas)", fontSize: "clamp(28px,5vw,44px)", color: "#fff", letterSpacing: "0.04em", lineHeight: 1 }}>{session.name}</h2>
             </div>
           </div>
-
-          <p style={{ fontFamily: "var(--font-barlow)", fontSize: 15, lineHeight: 1.65, color: "rgba(255,255,255,0.62)", maxWidth: 480 }}>
-            {session.vibe}
-          </p>
+          <p style={{ fontFamily: "var(--font-barlow)", fontSize: 15, lineHeight: 1.65, color: "rgba(255,255,255,0.62)", maxWidth: 480 }}>{session.vibe}</p>
         </div>
-
-        {/* Body */}
         <div style={{ padding: "24px 28px 28px" }}>
-          {/* Stats row */}
           <div style={{ display: "flex", gap: 20, marginBottom: 24, flexWrap: "wrap" }}>
             {[
               { label: "Duration", value: session.isCustom ? "Your call" : session.duration },
@@ -97,12 +100,10 @@ const SessionModal = memo(function SessionModal({
             ].map(({ label, value }) => (
               <div key={label} style={{ flex: "1 1 100px" }}>
                 <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.18em", color: "rgba(255,255,255,0.28)", textTransform: "uppercase", marginBottom: 4 }}>{label}</p>
-                <p style={{ fontFamily: "var(--font-sora, var(--font-grotesk))", fontSize: 15, fontWeight: 600, color: meta.lightColor }}>{value}</p>
+                <p style={{ fontFamily: "var(--font-barlow)", fontSize: 15, fontWeight: 600, color: meta.lightColor }}>{value}</p>
               </div>
             ))}
           </div>
-
-          {/* Equipment */}
           {!session.isCustom && session.equipment.length > 0 && (
             <div style={{ marginBottom: 24 }}>
               <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.2em", color: "rgba(255,255,255,0.28)", textTransform: "uppercase", marginBottom: 10 }}>What&apos;s included</p>
@@ -116,16 +117,13 @@ const SessionModal = memo(function SessionModal({
               </div>
             </div>
           )}
-
           {session.isCustom && (
-            <div style={{ marginBottom: 24, padding: "14px 16px", borderRadius: 12, background: `${meta.glowColor}0.08)`, border: `1px solid ${meta.lightColor}33` }}>
+            <div style={{ marginBottom: 24, padding: "14px 16px", borderRadius: 12, background: `${meta.lightColor}14`, border: `1px solid ${meta.lightColor}33` }}>
               <p style={{ fontFamily: "var(--font-barlow)", fontSize: 14, color: "rgba(255,255,255,0.6)", lineHeight: 1.6 }}>
-                Tell us exactly what you want. Hookahs, people, duration, flavours, host, catering, backdrop — we build it from scratch. Use the Package Wizard below for a live price.
+                Tell us exactly what you want. Hookahs, people, duration, flavours, host, catering — we build it from scratch. Use the Package Wizard for a live price.
               </p>
             </div>
           )}
-
-          {/* Price + CTA */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <div style={{ flex: 1 }}>
               <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.2em", color: "rgba(255,255,255,0.28)", textTransform: "uppercase", marginBottom: 2 }}>Starting from</p>
@@ -143,7 +141,7 @@ const SessionModal = memo(function SessionModal({
               fontFamily: "var(--font-bebas)", fontSize: 17, letterSpacing: "0.08em",
               padding: "12px 24px", borderRadius: 10, minHeight: 44,
               border: `1px solid ${meta.lightColor}`,
-              background: `${meta.glowColor}0.18)`,
+              background: `${meta.lightColor}22`,
               color: meta.lightColor, cursor: "pointer",
               transition: "all 0.2s ease",
             }}>
@@ -156,318 +154,302 @@ const SessionModal = memo(function SessionModal({
   );
 });
 
-// ─── Door SVG shapes ──────────────────────────────────────────────────────────
-function DoorShape({ style: doorStyle, color, isHovered }: { style: string; color: string; isHovered: boolean }) {
-  const c = color;
-  const glow = isHovered ? `0 0 24px ${c}88` : `0 0 8px ${c}44`;
-
-  // All doors share the same outer container sizing; just the inner shape differs
-  if (doorStyle === "double") {
-    return (
-      <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", gap: 3 }}>
-        {[0, 1].map(i => (
-          <div key={i} style={{
-            flex: 1, height: "100%", borderRadius: "4px 4px 0 0",
-            border: `1px solid ${c}66`, borderBottom: "none",
-            background: `linear-gradient(180deg, ${c}18 0%, ${c}06 60%, ${c}12 100%)`,
-            boxShadow: glow,
-            position: "relative", overflow: "hidden",
-          }}>
-            {/* Panel lines */}
-            <div style={{ position: "absolute", top: "20%", left: "15%", right: "15%", height: "35%", border: `1px solid ${c}33`, borderRadius: 2 }} />
-            <div style={{ position: "absolute", top: "62%", left: "15%", right: "15%", height: "25%", border: `1px solid ${c}33`, borderRadius: 2 }} />
-            {/* Handle */}
-            <div style={{ position: "absolute", top: "50%", right: i === 0 ? "12%" : "auto", left: i === 1 ? "12%" : "auto", width: 4, height: 18, borderRadius: 2, background: c, opacity: 0.7 }} />
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (doorStyle === "arch") {
-    return (
-      <div style={{
-        width: "100%", height: "100%",
-        border: `1px solid ${c}66`, borderBottom: "none",
-        borderRadius: "50% 50% 0 0 / 20% 20% 0 0",
-        background: `linear-gradient(180deg, ${c}20 0%, ${c}08 100%)`,
-        boxShadow: glow,
-        position: "relative", overflow: "hidden",
-      }}>
-        <div style={{ position: "absolute", top: "25%", left: "12%", right: "12%", height: "40%", border: `1px solid ${c}33`, borderRadius: "40% 40% 2px 2px / 15% 15% 2px 2px" }} />
-        <div style={{ position: "absolute", top: "72%", left: "12%", right: "12%", height: "20%", border: `1px solid ${c}33`, borderRadius: 2 }} />
-        <div style={{ position: "absolute", top: "52%", right: "14%", width: 5, height: 14, borderRadius: 2, background: c, opacity: 0.65 }} />
-      </div>
-    );
-  }
-
-  if (doorStyle === "steel") {
-    return (
-      <div style={{
-        width: "100%", height: "100%",
-        border: `2px solid ${c}88`, borderBottom: "none",
-        borderRadius: "2px 2px 0 0",
-        background: `linear-gradient(180deg, ${c}14 0%, rgba(20,30,50,0.9) 100%)`,
-        boxShadow: glow,
-        position: "relative", overflow: "hidden",
-      }}>
-        {/* Horizontal steel ribs */}
-        {[20, 38, 56, 74].map(top => (
-          <div key={top} style={{ position: "absolute", top: `${top}%`, left: 0, right: 0, height: 1, background: `${c}33` }} />
-        ))}
-        {/* Vertical center line */}
-        <div style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: 1, background: `${c}22` }} />
-        {/* Handle */}
-        <div style={{ position: "absolute", top: "48%", right: "10%", width: 6, height: 22, borderRadius: 3, background: c, opacity: 0.8 }} />
-      </div>
-    );
-  }
-
-  if (doorStyle === "grand") {
-    return (
-      <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", gap: 3 }}>
-        {[0, 1].map(i => (
-          <div key={i} style={{
-            flex: 1, height: "100%",
-            border: `1px solid ${c}77`, borderBottom: "none",
-            borderRadius: "30% 30% 0 0 / 8% 8% 0 0",
-            background: `linear-gradient(180deg, ${c}20 0%, ${c}0a 100%)`,
-            boxShadow: glow,
-            position: "relative", overflow: "hidden",
-          }}>
-            <div style={{ position: "absolute", top: "15%", left: "10%", right: "10%", height: "30%", border: `1px solid ${c}44`, borderRadius: "25% 25% 2px 2px / 10% 10% 2px 2px" }} />
-            <div style={{ position: "absolute", top: "52%", left: "10%", right: "10%", height: "30%", border: `1px solid ${c}33`, borderRadius: 2 }} />
-            {/* Gold handle ball */}
-            <div style={{ position: "absolute", top: "50%", right: i === 0 ? "8%" : "auto", left: i === 1 ? "8%" : "auto", width: 8, height: 8, borderRadius: "50%", background: c }} />
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (doorStyle === "exit") {
-    return (
-      <div style={{
-        width: "100%", height: "100%",
-        border: `1px solid ${c}55`, borderBottom: "none",
-        borderRadius: "3px 3px 0 0",
-        background: `linear-gradient(180deg, rgba(180,200,255,0.08) 0%, ${c}08 100%)`,
-        boxShadow: glow,
-        position: "relative", overflow: "hidden",
-      }}>
-        {/* Staircase illusion */}
-        {[60, 72, 84].map((top, ri) => (
-          <div key={ri} style={{ position: "absolute", top: `${top}%`, left: `${ri * 12}%`, right: 0, height: 3, background: `${c}44` }} />
-        ))}
-        {/* EXIT sign */}
-        <div style={{ position: "absolute", top: 8, left: "50%", transform: "translateX(-50%)", background: "#dc2626cc", padding: "2px 6px", borderRadius: 2 }}>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 7, color: "#fff", letterSpacing: "0.15em" }}>EXIT</span>
-        </div>
-        <div style={{ position: "absolute", top: "48%", right: "12%", width: 5, height: 14, borderRadius: 2, background: c, opacity: 0.7 }} />
-      </div>
-    );
-  }
-
-  if (doorStyle === "custom") {
-    return (
-      <div style={{
-        width: "100%", height: "100%",
-        border: `1px dashed ${c}77`, borderBottom: "none",
-        borderRadius: "4px 4px 0 0",
-        background: `repeating-linear-gradient(45deg, ${c}04 0px, ${c}04 4px, transparent 4px, transparent 12px)`,
-        boxShadow: glow,
-        position: "relative", overflow: "hidden",
-      }}>
-        {/* Plus symbol */}
-        <div style={{ position: "absolute", top: "35%", left: "50%", transform: "translate(-50%,-50%)", color: c, fontSize: 28, fontFamily: "var(--font-mono)", opacity: 0.5 }}>+</div>
-        <div style={{ position: "absolute", top: "52%", right: "12%", width: 5, height: 14, borderRadius: 2, background: c, opacity: 0.6 }} />
-      </div>
-    );
-  }
-
-  // wide / narrow (default)
-  return (
-    <div style={{
-      width: "100%", height: "100%",
-      border: `1px solid ${c}55`, borderBottom: "none",
-      borderRadius: "4px 4px 0 0",
-      background: `linear-gradient(180deg, ${c}18 0%, ${c}07 100%)`,
-      boxShadow: glow,
-      position: "relative", overflow: "hidden",
-    }}>
-      <div style={{ position: "absolute", top: "18%", left: "12%", right: "12%", height: "38%", border: `1px solid ${c}33`, borderRadius: 2 }} />
-      <div style={{ position: "absolute", top: "62%", left: "12%", right: "12%", height: "24%", border: `1px solid ${c}33`, borderRadius: 2 }} />
-      <div style={{ position: "absolute", top: "50%", right: "14%", width: 4, height: 14, borderRadius: 2, background: c, opacity: 0.65 }} />
-    </div>
-  );
-}
-
-// ─── Single Door ──────────────────────────────────────────────────────────────
-function SmokeRoomDoor({
+// ─── Single 3D Door ───────────────────────────────────────────────────────────
+function Door3D({
   session,
-  index,
-  wall,
+  position,
   onEnter,
 }: {
   session: SessionTier;
-  index: number;  // 0-3 within its wall
-  wall: "left" | "right";
+  position: [number, number, number];
   onEnter: (s: SessionTier) => void;
 }) {
   const meta = DOOR_META[session.id];
-  const [hovered, setHovered] = useState(false);
-  const doorRef    = useRef<HTMLDivElement>(null);
-  const lightRef   = useRef<HTMLDivElement>(null);
-  const smokeRef   = useRef<HTMLDivElement>(null);
-  const nameRef    = useRef<HTMLDivElement>(null);
-  const crackRef   = useRef<HTMLDivElement>(null);
+  const { scene } = useGLTF(meta.model);
+  const groupRef  = useRef<THREE.Group>(null!);
+  const meshRef   = useRef<THREE.Group>(null!);
+  const glowRef   = useRef<THREE.PointLight>(null!);
+  const cloned    = React.useMemo(() => scene.clone(true), [scene]);
 
-  // Door width varies by style
-  const doorW = ["double","grand","wide"].includes(meta.doorStyle) ? 110 : meta.doorStyle === "arch" ? 90 : 80;
+  const hovered   = useRef(false);
+  const swinging  = useRef(false);
+  const swingDir  = useRef(1);
 
-  // Vertical stagger — 4 doors per wall spread across the wall height
-  const topPercents = ["14%", "33%", "55%", "74%"];
-  const top = topPercents[index] ?? "40%";
-
+  // Normalise model scale to fit nicely in scene
   useEffect(() => {
-    if (!doorRef.current) return;
-    if (hovered) {
-      gsap.to(doorRef.current,  { scale: 1.04, duration: 0.35, ease: "power2.out" });
-      gsap.to(lightRef.current, { opacity: 1, scaleX: 1.6, scaleY: 1.4, duration: 0.45, ease: "power2.out" });
-      gsap.to(smokeRef.current, { opacity: 0.9, y: -8, duration: 0.5, ease: "power2.out" });
-      gsap.to(nameRef.current,  { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" });
-      gsap.to(crackRef.current, { opacity: 1, scaleX: 1, duration: 0.4, ease: "power2.out" });
-    } else {
-      gsap.to(doorRef.current,  { scale: 1, duration: 0.4, ease: "power2.out" });
-      gsap.to(lightRef.current, { opacity: 0.35, scaleX: 1, scaleY: 1, duration: 0.5, ease: "power2.out" });
-      gsap.to(smokeRef.current, { opacity: 0.35, y: 0, duration: 0.5, ease: "power2.out" });
-      gsap.to(nameRef.current,  { opacity: 0, y: 6, duration: 0.25, ease: "power2.in" });
-      gsap.to(crackRef.current, { opacity: 0, scaleX: 0, duration: 0.3, ease: "power2.in" });
-    }
-  }, [hovered]);
+    if (!meshRef.current) return;
+    const box = new THREE.Box3().setFromObject(meshRef.current);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const targetH = 2.6;
+    const s = targetH / maxDim;
+    meshRef.current.scale.setScalar(s);
+    // Centre at origin
+    box.setFromObject(meshRef.current);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    meshRef.current.position.sub(center);
+    meshRef.current.position.y += targetH / 2;
+  }, [cloned]);
 
-  const handleEnter = useCallback(() => {
-    if (!doorRef.current) return;
-    // Slam open: quick rotate then open modal
-    gsap.to(doorRef.current, {
-      rotateY: wall === "left" ? -35 : 35,
-      duration: 0.35,
-      ease: "power3.out",
-      onComplete: () => {
+  useFrame((_, delta) => {
+    if (!groupRef.current || !glowRef.current) return;
+
+    // Hover: levitate
+    const targetY = hovered.current ? position[1] + 0.18 : position[1];
+    groupRef.current.position.y += (targetY - groupRef.current.position.y) * 0.08;
+
+    // Glow pulse
+    const targetIntensity = hovered.current ? 6 : 1.5;
+    glowRef.current.intensity += (targetIntensity - glowRef.current.intensity) * 0.1;
+
+    // Ambient slow rotation when not hovered
+    if (!hovered.current && !swinging.current && meshRef.current) {
+      meshRef.current.rotation.y += delta * 0.18;
+    }
+  });
+
+  const handleClick = useCallback(() => {
+    if (swinging.current) return;
+    swinging.current = true;
+    hovered.current  = false;
+
+    const dir = swingDir.current;
+    gsap.timeline()
+      .to(meshRef.current!.rotation, {
+        y: dir * Math.PI * 0.55,
+        duration: 0.55,
+        ease: "power3.out",
+      })
+      .call(() => {
         onEnter(session);
-        gsap.to(doorRef.current, { rotateY: 0, duration: 0.4, ease: "power2.out", delay: 0.1 });
-      },
-    });
-  }, [onEnter, session, wall]);
+      })
+      .to(meshRef.current!.rotation, {
+        y: 0,
+        duration: 0.6,
+        ease: "power2.inOut",
+        delay: 0.3,
+        onComplete: () => { swinging.current = false; swingDir.current *= -1; },
+      });
+  }, [onEnter, session]);
+
+  const color = new THREE.Color(meta.lightColor);
 
   return (
-    <div style={{
-      position: "absolute",
-      top,
-      [wall === "left" ? "left" : "right"]: "6%",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      zIndex: 10,
-    }}>
-      {/* Overhead bulb */}
-      <div style={{
-        width: 8, height: 8, borderRadius: "50%",
-        background: meta.bulbColor,
-        boxShadow: `0 0 ${hovered ? 20 : 10}px ${meta.bulbColor}, 0 0 ${hovered ? 40 : 20}px ${meta.glowColor}0.5)`,
-        marginBottom: 6,
-        transition: "box-shadow 0.4s ease",
-      }} />
+    <group ref={groupRef} position={position}>
+      {/* Coloured point light above door */}
+      <pointLight
+        ref={glowRef}
+        position={[0, 2.2, 0.5]}
+        intensity={1.5}
+        distance={4}
+        color={color}
+      />
+      {/* Subtle fill from below */}
+      <pointLight
+        position={[0, -1, 0.8]}
+        intensity={hovered.current ? 2 : 0.6}
+        distance={3}
+        color={color}
+      />
 
-      {/* Wire from ceiling */}
-      <div style={{ width: 1, height: 20, background: `rgba(255,255,255,0.15)`, marginBottom: 0 }} />
-
-      {/* Door wrapper — perspective for the swinging effect */}
-      <div style={{ perspective: 600, perspectiveOrigin: wall === "left" ? "0% 50%" : "100% 50%" }}>
-        <div
-          ref={doorRef}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-          onClick={handleEnter}
-          style={{
-            width: doorW,
-            height: doorW * 1.95,
-            cursor: "pointer",
-            position: "relative",
-            transformStyle: "preserve-3d",
-            transformOrigin: wall === "left" ? "left center" : "right center",
-          }}
+      {/* Door mesh */}
+      <Float
+        speed={1.2}
+        rotationIntensity={0.08}
+        floatIntensity={0.12}
+        floatingRange={[-0.04, 0.04]}
+      >
+        <group
+          ref={meshRef}
+          onClick={handleClick}
+          onPointerEnter={() => { hovered.current = true; document.body.style.cursor = "pointer"; }}
+          onPointerLeave={() => { hovered.current = false; document.body.style.cursor = "default"; }}
         >
-          <DoorShape style={meta.doorStyle} color={meta.lightColor} isHovered={hovered} />
+          <primitive object={cloned} />
+        </group>
+      </Float>
 
-          {/* Light crack at door edge */}
-          <div ref={crackRef} style={{
-            position: "absolute",
-            top: "5%", bottom: 0,
-            [wall === "left" ? "right" : "left"]: -2,
-            width: 3,
-            background: `linear-gradient(180deg, transparent, ${meta.lightColor}, ${meta.lightColor}cc, transparent)`,
-            opacity: 0,
-            transformOrigin: wall === "left" ? "right center" : "left center",
-            scaleX: 0,
-            borderRadius: 2,
-            filter: `blur(1px)`,
-          } as React.CSSProperties} />
+      {/* Floor glow pool under door */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.28, 0]}>
+        <circleGeometry args={[0.9, 32]} />
+        <meshBasicMaterial color={color} transparent opacity={0.18} />
+      </mesh>
 
-          {/* Nameplate */}
-          <div style={{ position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", marginBottom: 6, whiteSpace: "nowrap", pointerEvents: "none" }}>
-            {/* Always-visible tag */}
-            <div style={{ textAlign: "center" }}>
-              <p style={{ fontFamily: "var(--font-bebas)", fontSize: 13, letterSpacing: "0.08em", color: meta.lightColor, lineHeight: 1, marginBottom: 1 }}>
-                {session.name}
-              </p>
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.12em", color: "rgba(255,255,255,0.35)", textTransform: "uppercase" }}>
-                {session.isCustom ? "Custom" : kes(session.price)}
-              </p>
-            </div>
-            {/* Hover tooltip */}
-            <div ref={nameRef} style={{
-              marginTop: 4, opacity: 0, transform: "translateY(6px)",
-              background: "rgba(5,3,10,0.95)", border: `1px solid ${meta.lightColor}55`,
-              borderRadius: 8, padding: "6px 10px", textAlign: "center",
-            }}>
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.14em", color: meta.lightColor, textTransform: "uppercase" }}>
-                {meta.ambientText} · Enter →
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Floor light cone */}
-      <div ref={lightRef} style={{
-        width: doorW * 1.4,
-        height: 60,
-        background: `radial-gradient(ellipse at 50% 0%, ${meta.glowColor}0.55) 0%, ${meta.glowColor}0.2) 40%, transparent 75%)`,
-        opacity: 0.35,
-        transformOrigin: "top center",
-        marginTop: -4,
-        pointerEvents: "none",
-        filter: "blur(2px)",
-      }} />
-
-      {/* Smoke seeping under the door */}
-      <div ref={smokeRef} style={{
-        width: doorW * 1.2,
-        height: 18,
-        marginTop: -22,
-        background: `radial-gradient(ellipse at 50% 100%, rgba(255,255,255,0.12) 0%, transparent 70%)`,
-        opacity: 0.35,
-        filter: "blur(4px)",
-        pointerEvents: "none",
-        animation: "door-smoke 3s ease-in-out infinite",
-        animationDelay: `${index * 0.7}s`,
-      }} />
-    </div>
+      {/* Nameplate — always visible */}
+      <group position={[0, -1.55, 0.1]}>
+        {/* Name */}
+        <mesh position={[0, 0.12, 0]}>
+          <planeGeometry args={[1.6, 0.22]} />
+          <meshBasicMaterial color="#08041a" transparent opacity={0.85} />
+        </mesh>
+      </group>
+    </group>
   );
 }
 
-// ─── Mobile version ───────────────────────────────────────────────────────────
+// ─── Smoke particles in 3D space ──────────────────────────────────────────────
+function RoomSmoke() {
+  const ref = useRef<THREE.Points>(null!);
+  const mat = useRef<THREE.ShaderMaterial>(null!);
+
+  const geo = React.useMemo(() => {
+    const N = 300;
+    const pos = new Float32Array(N * 3);
+    const life = new Float32Array(N);
+    const spd  = new Float32Array(N);
+    const sz   = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      pos[i*3]   = (Math.random() - 0.5) * 14;
+      pos[i*3+1] = Math.random() * -1.5;
+      pos[i*3+2] = (Math.random() - 0.5) * 6;
+      life[i] = Math.random();
+      spd[i]  = 0.04 + Math.random() * 0.06;
+      sz[i]   = 0.08 + Math.random() * 0.18;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("aLife",    new THREE.BufferAttribute(life, 1));
+    g.setAttribute("aSpeed",   new THREE.BufferAttribute(spd, 1));
+    g.setAttribute("aSize",    new THREE.BufferAttribute(sz, 1));
+    return g;
+  }, []);
+
+  useFrame(({ clock }) => {
+    if (mat.current) mat.current.uniforms.uTime.value = clock.getElapsedTime();
+  });
+
+  return (
+    <points ref={ref} geometry={geo}>
+      <shaderMaterial
+        ref={mat}
+        transparent
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+        uniforms={{ uTime: { value: 0 } }}
+        vertexShader={`
+          uniform float uTime;
+          attribute float aLife;
+          attribute float aSpeed;
+          attribute float aSize;
+          varying float vAlpha;
+          void main() {
+            float t = mod(uTime * aSpeed + aLife, 1.0);
+            vec3 pos = position;
+            pos.y += t * 2.5;
+            pos.x += sin(t * 3.0 + aLife * 6.28) * 0.3 * t;
+            vAlpha = smoothstep(0.0,0.1,t) * (1.0 - smoothstep(0.6,1.0,t)) * 0.25;
+            vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+            gl_PointSize = aSize * (300.0 / -mv.z);
+            gl_Position = projectionMatrix * mv;
+          }
+        `}
+        fragmentShader={`
+          varying float vAlpha;
+          void main() {
+            float d = length(gl_PointCoord - 0.5) * 2.0;
+            float disc = 1.0 - smoothstep(0.4, 1.0, d);
+            if (disc < 0.01) discard;
+            gl_FragColor = vec4(vec3(0.7, 0.7, 0.85), disc * vAlpha);
+          }
+        `}
+      />
+    </points>
+  );
+}
+
+// ─── Neon floor grid ──────────────────────────────────────────────────────────
+function FloorGrid() {
+  const ref = useRef<THREE.Mesh>(null!);
+  useFrame(({ clock }) => {
+    if (ref.current) {
+      (ref.current.material as THREE.ShaderMaterial).uniforms.uTime.value = clock.getElapsedTime();
+    }
+  });
+  return (
+    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.32, 0]}>
+      <planeGeometry args={[22, 10, 44, 20]} />
+      <shaderMaterial
+        transparent
+        uniforms={{ uTime: { value: 0 } }}
+        vertexShader={`
+          varying vec2 vUv;
+          void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+        `}
+        fragmentShader={`
+          uniform float uTime;
+          varying vec2 vUv;
+          void main() {
+            vec2 grid = abs(fract(vUv * vec2(22.0, 10.0)) - 0.5);
+            float line = min(grid.x, grid.y);
+            float g = 1.0 - smoothstep(0.0, 0.04, line);
+            float pulse = 0.4 + 0.15 * sin(uTime * 0.8);
+            float fade = (1.0 - length(vUv - 0.5) * 1.6);
+            gl_FragColor = vec4(0.13, 0.82, 0.94, g * pulse * max(0.0, fade));
+          }
+        `}
+      />
+    </mesh>
+  );
+}
+
+// ─── Camera parallax on mouse ─────────────────────────────────────────────────
+function CameraRig({ mouse }: { mouse: React.MutableRefObject<{ x: number; y: number }> }) {
+  const { camera } = useThree();
+  useFrame(() => {
+    camera.position.x += (mouse.current.x * 1.2 - camera.position.x) * 0.03;
+    camera.position.y += (-mouse.current.y * 0.6 + 1.5 - camera.position.y) * 0.03;
+    camera.lookAt(0, 0.5, -1.5);
+  });
+  return null;
+}
+
+// ─── Full 3D scene ────────────────────────────────────────────────────────────
+function SmokeRoomScene({
+  onEnter,
+  mouse,
+}: {
+  onEnter: (s: SessionTier) => void;
+  mouse: React.MutableRefObject<{ x: number; y: number }>;
+}) {
+  return (
+    <>
+      <CameraRig mouse={mouse} />
+
+      {/* Environment */}
+      <Environment preset="night" />
+      <ambientLight intensity={0.08} />
+      <pointLight position={[0, 6, 0]} intensity={3} color="#7c3aed" distance={12} />
+      <pointLight position={[-8, 3, -4]} intensity={2} color="#06b6d4" distance={10} />
+      <pointLight position={[8, 3, -4]}  intensity={2} color="#7c3aed" distance={10} />
+
+      {/* Floor */}
+      <FloorGrid />
+
+      {/* Smoke */}
+      <RoomSmoke />
+
+      {/* Fog plane at floor */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.28, 0]}>
+        <planeGeometry args={[22, 10]} />
+        <meshBasicMaterial color="#06031a" transparent opacity={0.55} />
+      </mesh>
+
+      {/* 8 doors */}
+      {SESSIONS.map(session => (
+        <Door3D
+          key={session.id}
+          session={session}
+          position={DOOR_POSITIONS[session.id] as [number,number,number]}
+          onEnter={onEnter}
+        />
+      ))}
+    </>
+  );
+}
+
+// ─── Mobile list ──────────────────────────────────────────────────────────────
 function MobileSessions({ onSelect }: { onSelect: (s: SessionTier) => void }) {
   return (
     <div style={{ padding: "16px 0 32px" }}>
@@ -483,7 +465,7 @@ function MobileSessions({ onSelect }: { onSelect: (s: SessionTier) => void }) {
               padding: "14px 16px", borderRadius: 14, textAlign: "left",
               border: `1px solid ${meta.lightColor}33`,
               borderLeft: `3px solid ${meta.lightColor}`,
-              background: `${meta.glowColor}0.05)`,
+              background: `${meta.lightColor}0d`,
               cursor: "pointer", minHeight: 60, width: "100%",
             }}>
               <span style={{ fontSize: 28, filter: `drop-shadow(0 0 8px ${meta.lightColor})` }}>{s.emoji}</span>
@@ -500,19 +482,67 @@ function MobileSessions({ onSelect }: { onSelect: (s: SessionTier) => void }) {
   );
 }
 
-// ─── The Smoke Room ───────────────────────────────────────────────────────────
-export default function SessionsSection() {
-  const isMobile        = useIsMobile();
-  const { setBookingOpen, addToCart } = useStore();
-  const [selected, setSelected] = useState<SessionTier | null>(null);
-  const roomRef    = useRef<HTMLDivElement>(null);
-  const cameraRef  = useRef<HTMLDivElement>(null);
-  const mouseRef   = useRef({ x: 0, y: 0 });
-  const rafRef     = useRef<number>(0);
-  const orbitRef   = useRef({ x: 0, y: 0 });
+// ─── HTML door labels overlay ─────────────────────────────────────────────────
+// Positioned absolutely over the canvas using CSS — avoids THREE.js text complexity
+function DoorLabels({ sessions }: { sessions: SessionTier[] }) {
+  // 4 columns × 2 rows grid matching the 3D layout
+  const cols = [0, 1, 2, 3];
+  const rows = [
+    sessions.slice(0, 4),
+    sessions.slice(4, 8),
+  ];
 
-  // Particle smoke puffs that drift up from floor
-  const PUFFS = 22;
+  return (
+    <div style={{
+      position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5,
+      display: "flex", flexDirection: "column", justifyContent: "space-around",
+      padding: "12% 6% 8%",
+    }}>
+      {rows.map((row, ri) => (
+        <div key={ri} style={{ display: "flex", justifyContent: "space-around", alignItems: "flex-end" }}>
+          {row.map(s => {
+            const meta = DOOR_META[s.id];
+            return (
+              <div key={s.id} style={{ textAlign: "center", width: "22%" }}>
+                <p style={{ fontFamily: "var(--font-bebas)", fontSize: "clamp(11px,1.2vw,16px)", letterSpacing: "0.06em", color: meta.lightColor, lineHeight: 1, marginBottom: 2 }}>
+                  {s.name}
+                </p>
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(7px,0.7vw,10px)", letterSpacing: "0.1em", color: "rgba(255,255,255,0.35)", textTransform: "uppercase" }}>
+                  {s.isCustom ? "custom" : kes(s.price)}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Main export ──────────────────────────────────────────────────────────────
+export default function SessionsSection() {
+  const isMobile = useIsMobile();
+  const { setBookingOpen, addToCart } = useStore();
+  const [selected, setSelected]   = useState<SessionTier | null>(null);
+  const [mounted, setMounted]     = useState(false);
+  const mouseRef = useRef({ x: 0, y: 0 });
+  const sectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => {
+    if (isMobile) return;
+    const onMove = (e: MouseEvent) => {
+      const rect = sectionRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      mouseRef.current = {
+        x: ((e.clientX - rect.left) / rect.width  - 0.5) * 2,
+        y: ((e.clientY - rect.top)  / rect.height - 0.5) * 2,
+      };
+    };
+    window.addEventListener("mousemove", onMove, { passive: true });
+    return () => window.removeEventListener("mousemove", onMove);
+  }, [isMobile]);
 
   const handleBook = useCallback((session: SessionTier) => {
     if (session.isCustom) {
@@ -523,280 +553,80 @@ export default function SessionsSection() {
     setBookingOpen(true);
   }, [addToCart, setBookingOpen]);
 
-  // Mouse parallax camera drift
-  useEffect(() => {
-    if (isMobile) return;
-
-    const onMove = (e: MouseEvent) => {
-      const rect = roomRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      mouseRef.current = {
-        x: ((e.clientX - rect.left) / rect.width  - 0.5) * 2,
-        y: ((e.clientY - rect.top)  / rect.height - 0.5) * 2,
-      };
-    };
-    window.addEventListener("mousemove", onMove, { passive: true });
-
-    const loop = () => {
-      rafRef.current = requestAnimationFrame(loop);
-      const target = { x: mouseRef.current.x * 3.5, y: -mouseRef.current.y * 2 };
-      orbitRef.current.x += (target.x - orbitRef.current.x) * 0.04;
-      orbitRef.current.y += (target.y - orbitRef.current.y) * 0.04;
-      if (cameraRef.current) {
-        cameraRef.current.style.transform = `rotateX(${orbitRef.current.y}deg) rotateY(${orbitRef.current.x}deg)`;
-      }
-    };
-    loop();
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, [isMobile]);
-
-  const leftSessions  = SESSIONS.filter(s => DOOR_META[s.id]?.wallPos === "left");
-  const rightSessions = SESSIONS.filter(s => DOOR_META[s.id]?.wallPos === "right");
-
   return (
     <section
       id="sessions"
-      style={{
-        background: "var(--void)",
-        position: "relative",
-        overflow: "hidden",
-        paddingBottom: isMobile ? 0 : "clamp(60px,8vw,100px)",
-      }}
+      ref={sectionRef}
+      style={{ background: "var(--void)", position: "relative", overflow: "hidden", paddingBottom: isMobile ? 0 : "clamp(60px,8vw,100px)" }}
     >
-      {/* Inject door-smoke keyframe */}
       <style>{`
-        @keyframes door-smoke {
-          0%,100% { transform: scaleX(1) translateY(0); opacity: 0.35; }
-          50%      { transform: scaleX(1.15) translateY(-4px); opacity: 0.55; }
-        }
         @keyframes fog-drift {
-          0%   { transform: translateX(0)    scaleY(1); }
-          50%  { transform: translateX(40px) scaleY(1.08); }
-          100% { transform: translateX(0)    scaleY(1); }
-        }
-        @keyframes puff-rise {
-          0%   { transform: translateY(0)   scaleX(1);   opacity: 0; }
-          15%  { opacity: 0.18; }
-          80%  { opacity: 0.06; }
-          100% { transform: translateY(-90px) scaleX(2.4); opacity: 0; }
-        }
-        @keyframes grid-pulse {
-          0%,100% { opacity: 0.35; }
-          50%     { opacity: 0.55; }
+          0%,100% { transform: translateX(0) scaleY(1); }
+          50%      { transform: translateX(30px) scaleY(1.06); }
         }
       `}</style>
 
-      {/* ── Section header ── */}
-      <div style={{
-        position: "relative", zIndex: 20,
-        padding: isMobile ? "clamp(40px,6vw,60px) 16px 0" : "clamp(52px,7vw,88px) 5vw 0",
-        pointerEvents: "none",
-      }}>
+      {/* Header */}
+      <div style={{ position: "relative", zIndex: 20, padding: isMobile ? "clamp(40px,6vw,60px) 16px 0" : "clamp(52px,7vw,88px) 5vw 0", pointerEvents: "none" }}>
         <div style={{ textAlign: isMobile ? "left" : "center" }}>
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.3em", color: "var(--cyan-bright)", textTransform: "uppercase", marginBottom: 12, opacity: 0.8 }}>
             8 Ways to Session
           </p>
-          <h2 style={{
-            fontFamily: "var(--font-bebas)", fontWeight: 400,
-            fontSize: isMobile ? "clamp(44px,11vw,64px)" : "clamp(56px,7vw,100px)",
-            lineHeight: 0.92, letterSpacing: "0.04em", color: "#fff", marginBottom: 12,
-          }}>
+          <h2 style={{ fontFamily: "var(--font-bebas)", fontWeight: 400, fontSize: isMobile ? "clamp(44px,11vw,64px)" : "clamp(56px,7vw,100px)", lineHeight: 0.92, letterSpacing: "0.04em", color: "#fff", marginBottom: 12 }}>
             Pick Your <span style={{ color: "var(--violet)" }}>Vibe.</span>
           </h2>
-          <p style={{
-            fontFamily: "var(--font-barlow)", fontSize: isMobile ? 13 : "clamp(13px,1.8vw,16px)",
-            color: "rgba(255,255,255,0.4)", maxWidth: 440, margin: isMobile ? "0" : "0 auto",
-          }}>
-            {isMobile ? "Tap a session to see what's inside." : "Eight doors. Eight worlds. Step inside the one that fits your night."}
+          <p style={{ fontFamily: "var(--font-barlow)", fontSize: isMobile ? 13 : "clamp(13px,1.8vw,16px)", color: "rgba(255,255,255,0.4)", maxWidth: 440, margin: isMobile ? "0" : "0 auto" }}>
+            {isMobile ? "Tap a session to see what's inside." : "Eight doors. Eight worlds. Click a door to enter."}
           </p>
         </div>
       </div>
 
-      {/* ── Mobile ── */}
+      {/* Mobile */}
       {isMobile && (
         <div style={{ padding: "0 16px", position: "relative", zIndex: 10 }}>
           <MobileSessions onSelect={setSelected} />
         </div>
       )}
 
-      {/* ── Desktop: The Smoke Room ── */}
-      {!isMobile && (
-        <div
-          ref={roomRef}
-          style={{
-            position: "relative",
-            width: "100%",
-            height: "82vh",
-            overflow: "hidden",
-            marginTop: 32,
-            perspective: "900px",
-            perspectiveOrigin: "50% 44%",
-          }}
-        >
-          {/* Camera pivot */}
-          <div
-            ref={cameraRef}
-            style={{
-              position: "absolute",
-              inset: 0,
-              transformStyle: "preserve-3d",
-              willChange: "transform",
-            }}
+      {/* Desktop — 3D Smoke Room */}
+      {!isMobile && mounted && (
+        <div style={{ position: "relative", width: "100%", height: "80vh", marginTop: 24 }}>
+          <Canvas
+            camera={{ position: [0, 1.5, 6.5], fov: 62, near: 0.1, far: 100 }}
+            dpr={[1, 1.5]}
+            gl={{ alpha: true, antialias: true, toneMapping: 4, powerPreference: "high-performance" }}
+            style={{ background: "transparent" }}
           >
-            {/* ── Ceiling ── */}
-            <div style={{
-              position: "absolute", top: 0, left: 0, right: 0, height: "42%",
-              background: "linear-gradient(180deg, #030109 0%, #08041a 100%)",
-              transformOrigin: "top center",
-              transform: "rotateX(-6deg)",
-              borderBottom: "1px solid rgba(124,58,237,0.12)",
-            }}>
-              {/* Ceiling hex texture */}
-              <div style={{
-                position: "absolute", inset: 0, opacity: 0.06,
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100' viewBox='0 0 56 100'%3E%3Cpath d='M28 0l28 16v32L28 64 0 48V16z' fill='none' stroke='%237c3aed' stroke-width='0.8'/%3E%3C/svg%3E")`,
-                backgroundSize: "56px 100px",
-              }} />
-              {/* Central chandelier glow */}
-              <div style={{
-                position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
-                width: 180, height: 60,
-                background: "radial-gradient(ellipse at 50% 100%, rgba(124,58,237,0.35) 0%, transparent 70%)",
-                filter: "blur(8px)",
-              }} />
-            </div>
+            <Suspense fallback={null}>
+              <SmokeRoomScene onEnter={setSelected} mouse={mouseRef} />
+            </Suspense>
+          </Canvas>
 
-            {/* ── Floor ── */}
-            <div style={{
-              position: "absolute", bottom: 0, left: 0, right: 0, height: "52%",
-              background: "linear-gradient(0deg, #020108 0%, #06031a 100%)",
-              transformOrigin: "bottom center",
-              transform: "rotateX(6deg)",
-              borderTop: "1px solid rgba(34,211,238,0.1)",
-              overflow: "hidden",
-            }}>
-              {/* Neon grid */}
-              <div style={{
-                position: "absolute", inset: 0,
-                backgroundImage: `
-                  linear-gradient(rgba(34,211,238,0.18) 1px, transparent 1px),
-                  linear-gradient(90deg, rgba(34,211,238,0.18) 1px, transparent 1px)
-                `,
-                backgroundSize: "80px 80px",
-                animation: "grid-pulse 4s ease-in-out infinite",
-                maskImage: "linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.8) 40%, rgba(0,0,0,0.3) 100%)",
-              }} />
-
-              {/* Floor reflection glow strips */}
-              {SESSIONS.map((s) => {
-                const meta = DOOR_META[s.id];
-                const leftPct = meta.wallPos === "left" ? "18%" : "72%";
-                return (
-                  <div key={s.id} style={{
-                    position: "absolute", top: 0, left: leftPct,
-                    width: 80, height: "100%",
-                    background: `linear-gradient(180deg, ${meta.glowColor}0.06) 0%, transparent 70%)`,
-                    pointerEvents: "none",
-                  }} />
-                );
-              })}
-
-              {/* Fog layer at floor level */}
-              <div style={{
-                position: "absolute", bottom: 0, left: "-10%", right: "-10%", height: 80,
-                background: "linear-gradient(180deg, transparent 0%, rgba(15,8,35,0.7) 100%)",
-                animation: "fog-drift 12s ease-in-out infinite",
-                filter: "blur(6px)",
-                pointerEvents: "none",
-              }} />
-
-              {/* Rising smoke puffs */}
-              {Array.from({ length: PUFFS }).map((_, pi) => (
-                <div key={pi} style={{
-                  position: "absolute",
-                  left: `${6 + (pi / PUFFS) * 88}%`,
-                  bottom: `${Math.random() * 30}%`,
-                  width: 24 + Math.random() * 30,
-                  height: 24 + Math.random() * 20,
-                  borderRadius: "50%",
-                  background: "rgba(255,255,255,0.055)",
-                  filter: "blur(8px)",
-                  animation: `puff-rise ${5 + Math.random() * 8}s ease-in infinite`,
-                  animationDelay: `${Math.random() * 8}s`,
-                  pointerEvents: "none",
-                }} />
-              ))}
-            </div>
-
-            {/* ── Back wall ── */}
-            <div style={{
-              position: "absolute", top: "38%", left: 0, right: 0, height: "24%",
-              background: "linear-gradient(180deg, #08041a 0%, #05030e 100%)",
-              borderTop: "1px solid rgba(255,255,255,0.04)",
-              borderBottom: "1px solid rgba(255,255,255,0.04)",
-            }}>
-              {/* Centre arch / logo area */}
-              <div style={{
-                position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-                textAlign: "center", pointerEvents: "none",
-              }}>
-                <p style={{ fontFamily: "var(--font-bebas)", fontSize: "clamp(14px,2.5vw,22px)", color: "rgba(255,255,255,0.07)", letterSpacing: "0.5em", textTransform: "uppercase" }}>
-                  HKH · THE SMOKE ROOM
-                </p>
-                <div style={{ width: 80, height: 1, background: "rgba(255,255,255,0.06)", margin: "6px auto 0" }} />
-              </div>
-            </div>
-
-            {/* ── Left wall ── */}
-            <div style={{
-              position: "absolute", top: "8%", left: 0, width: "24%", bottom: "8%",
-              background: "linear-gradient(90deg, #030109 0%, #07031a 100%)",
-              borderRight: "1px solid rgba(255,255,255,0.04)",
-              overflow: "visible",
-            }}>
-              {/* Wall texture */}
-              <div style={{ position: "absolute", inset: 0, opacity: 0.04, backgroundImage: `repeating-linear-gradient(0deg, rgba(255,255,255,0.3) 0px, rgba(255,255,255,0.3) 1px, transparent 1px, transparent 60px)` }} />
-              {leftSessions.map((s, i) => (
-                <SmokeRoomDoor key={s.id} session={s} index={i} wall="left" onEnter={setSelected} />
-              ))}
-            </div>
-
-            {/* ── Right wall ── */}
-            <div style={{
-              position: "absolute", top: "8%", right: 0, width: "24%", bottom: "8%",
-              background: "linear-gradient(270deg, #030109 0%, #07031a 100%)",
-              borderLeft: "1px solid rgba(255,255,255,0.04)",
-              overflow: "visible",
-            }}>
-              <div style={{ position: "absolute", inset: 0, opacity: 0.04, backgroundImage: `repeating-linear-gradient(0deg, rgba(255,255,255,0.3) 0px, rgba(255,255,255,0.3) 1px, transparent 1px, transparent 60px)` }} />
-              {rightSessions.map((s, i) => (
-                <SmokeRoomDoor key={s.id} session={s} index={i} wall="right" onEnter={setSelected} />
-              ))}
-            </div>
-          </div>
-
-          {/* ── Vignette ── */}
+          {/* Nebula background behind canvas */}
           <div style={{
-            position: "absolute", inset: 0, pointerEvents: "none", zIndex: 15,
-            background: "radial-gradient(ellipse 75% 75% at 50% 50%, transparent 45%, rgba(3,1,9,0.75) 100%)",
+            position: "absolute", inset: 0, zIndex: -1,
+            background: "radial-gradient(ellipse 80% 60% at 50% 60%, #0d0626 0%, #05030a 70%)",
           }} />
 
-          {/* ── Hint ── */}
+          {/* Door name labels overlay */}
+          <DoorLabels sessions={SESSIONS} />
+
+          {/* Vignette */}
           <div style={{
-            position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)",
-            zIndex: 20, pointerEvents: "none", textAlign: "center",
-          }}>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.22em", color: "rgba(255,255,255,0.18)", textTransform: "uppercase" }}>
-              Move mouse to explore · click a door to enter
+            position: "absolute", inset: 0, pointerEvents: "none", zIndex: 6,
+            background: "radial-gradient(ellipse 80% 80% at 50% 50%, transparent 40%, rgba(3,1,9,0.8) 100%)",
+          }} />
+
+          {/* Hint */}
+          <div style={{ position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)", zIndex: 10, pointerEvents: "none" }}>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.22em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+              move mouse to shift view · click any door to enter
             </p>
           </div>
         </div>
       )}
 
-      {/* ── Footer note ── */}
+      {/* Footer */}
       <div style={{ textAlign: "center", marginTop: isMobile ? 12 : 28, padding: "0 5vw", position: "relative", zIndex: 1 }}>
         <p style={{ fontFamily: "var(--font-serif, var(--font-grotesk))", fontStyle: "italic", fontSize: 13, color: "rgba(255,255,255,0.16)", letterSpacing: "0.05em" }}>
           All sessions include setup · teardown · premium coal management · Nairobi delivery
@@ -809,3 +639,6 @@ export default function SessionsSection() {
     </section>
   );
 }
+
+// Preload all door models
+Object.values(DOOR_META).forEach(m => useGLTF.preload(m.model));
