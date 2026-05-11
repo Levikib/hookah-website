@@ -118,10 +118,10 @@ export default function CustomCursor() {
 
   useEffect(() => {
     window.addEventListener("mousemove",  onMouseMove,  { passive: true });
-    document.addEventListener("mouseover", onMouseOver);
-    document.addEventListener("mouseleave", onMouseLeave);
-    window.addEventListener("mousedown",  onMouseDown);
-    window.addEventListener("mouseup",    onMouseUp);
+    document.addEventListener("mouseover",  onMouseOver,  { passive: true });
+    document.addEventListener("mouseleave", onMouseLeave, { passive: true });
+    window.addEventListener("mousedown",  onMouseDown, { passive: true });
+    window.addEventListener("mouseup",    onMouseUp,   { passive: true });
     return () => {
       window.removeEventListener("mousemove",  onMouseMove);
       document.removeEventListener("mouseover", onMouseOver);

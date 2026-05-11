@@ -210,8 +210,8 @@ export default function DisassemblySection() {
         <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
           <Canvas
             camera={cameraProps}
-            dpr={isMobile ? [1, 1] : [1, 1.5]}
-            gl={{ alpha: true, antialias: !isMobile }}
+            dpr={[1, 1.5]}
+            gl={{ alpha: true, antialias: true, toneMapping: 4, powerPreference: "high-performance" }}
             style={{ background: "transparent" }}
           >
             <Suspense fallback={null}>
@@ -281,19 +281,22 @@ export default function DisassemblySection() {
                 style={{ textDecoration: "none", display: "block" }}
               >
                 <div
-                  className="glass"
                   style={{
                     padding: cardPadding,
-                    borderLeft: cardSide === "left" ? `2px solid ${item.accent}` : "none",
-                    borderRight: cardSide === "right" ? `2px solid ${item.accent}` : "none",
+                    background: "rgba(8,4,18,0.92)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderLeft: cardSide === "left" ? `2px solid ${item.accent}` : "1px solid rgba(255,255,255,0.08)",
+                    borderRight: cardSide === "right" ? `2px solid ${item.accent}` : "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 16,
                     cursor: "pointer",
                     transition: "box-shadow 0.2s ease",
+                    boxShadow: "0 4px 24px rgba(0,0,0,0.6)",
                   }}
                   onMouseEnter={e => {
-                    (e.currentTarget as HTMLDivElement).style.boxShadow = `inset 0 0 24px ${item.accent}22, 0 8px 32px rgba(0,0,0,0.5)`;
+                    (e.currentTarget as HTMLDivElement).style.boxShadow = `inset 0 0 24px ${item.accent}22, 0 8px 32px rgba(0,0,0,0.7)`;
                   }}
                   onMouseLeave={e => {
-                    (e.currentTarget as HTMLDivElement).style.boxShadow = "";
+                    (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.6)";
                   }}
                 >
                   {/* Tag */}

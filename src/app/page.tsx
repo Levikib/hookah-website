@@ -189,7 +189,7 @@ export default function Home() {
             <Canvas
               camera={{ position: [0, -0.4, 5.2], fov: 58 }}
               dpr={isMobile ? [1, 1] : [1, 1.5]}
-              gl={{ alpha: true, antialias: true, toneMapping: 4 }}
+              gl={{ alpha: true, antialias: true, toneMapping: 4, powerPreference: "high-performance" }}
               style={{ background: "transparent" }}
               onCreated={() => setPreloaderDone(true)}
             >

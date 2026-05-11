@@ -49,11 +49,12 @@ const LAYOUT_META: Record<Layout, { label: string; hint: string }> = {
 
 interface Pos { x: number; y: number; z: number; rx: number; ry: number; rz: number; }
 
-function spherePos(): Pos[] {
-  const N = FLAVOURS.length;
-  const R = 440;
-  return FLAVOURS.map((_, i) => {
-    const phi   = Math.acos(1 - (2 * (i + 0.5)) / N);
+// Positions for N items (not always 36) — tight packing regardless of count
+function computeSpherePos(n: number): Pos[] {
+  if (n === 0) return [];
+  const R = Math.max(240, Math.min(440, 180 + n * 8));
+  return Array.from({ length: n }, (_, i) => {
+    const phi   = Math.acos(1 - (2 * (i + 0.5)) / n);
     const theta = Math.PI * (1 + Math.sqrt(5)) * i;
     const x = R * Math.sin(phi) * Math.cos(theta);
     const y = R * Math.sin(phi) * Math.sin(theta);
@@ -64,44 +65,46 @@ function spherePos(): Pos[] {
   });
 }
 
-function helixPos(): Pos[] {
-  const N = FLAVOURS.length;
-  const R = 340;
-  const H = 1600;
-  // Split into two independent strands, each with its own index sequence
+function computeHelixPos(n: number): Pos[] {
+  if (n === 0) return [];
+  const R = 300;
+  const H = Math.max(600, Math.min(1600, n * 44));
+  const turns = Math.max(1.5, Math.min(3.5, n / 10));
+
   const strandA: number[] = [];
   const strandB: number[] = [];
-  for (let i = 0; i < N; i++) {
+  for (let i = 0; i < n; i++) {
     if (i % 2 === 0) strandA.push(i); else strandB.push(i);
   }
+  const result: Pos[] = new Array(n);
   const nA = strandA.length;
   const nB = strandB.length;
-  const result: Pos[] = new Array(N);
-  const turns = 3.5;
+
   strandA.forEach((globalIdx, si) => {
-    const t = si / (nA - 1);
+    const t = nA > 1 ? si / (nA - 1) : 0.5;
     const angle = t * Math.PI * 2 * turns;
-    const x = Math.cos(angle) * R;
-    const z = Math.sin(angle) * R;
-    const y = (t - 0.5) * -H;
-    const ry = -angle * (180 / Math.PI);
-    result[globalIdx] = { x, y, z, rx: 0, ry, rz: 0 };
+    result[globalIdx] = {
+      x: Math.cos(angle) * R,
+      z: Math.sin(angle) * R,
+      y: (t - 0.5) * -H,
+      rx: 0,
+      ry: -angle * (180 / Math.PI),
+      rz: 0,
+    };
   });
   strandB.forEach((globalIdx, si) => {
-    const t = si / (nB - 1);
-    // Offset by half a turn so strands interleave
+    const t = nB > 1 ? si / (nB - 1) : 0.5;
     const angle = t * Math.PI * 2 * turns + Math.PI;
-    const x = Math.cos(angle) * R;
-    const z = Math.sin(angle) * R;
-    const y = (t - 0.5) * -H;
-    const ry = -angle * (180 / Math.PI);
-    result[globalIdx] = { x, y, z, rx: 0, ry, rz: 0 };
+    result[globalIdx] = {
+      x: Math.cos(angle) * R,
+      z: Math.sin(angle) * R,
+      y: (t - 0.5) * -H,
+      rx: 0,
+      ry: -angle * (180 / Math.PI),
+      rz: 0,
+    };
   });
   return result;
-}
-
-function getPositions(layout: Layout): Pos[] {
-  return layout === "SPHERE" ? spherePos() : helixPos();
 }
 
 // ─── Flavour Detail Modal ─────────────────────────────────────────────────────
@@ -389,9 +392,7 @@ function MobileCard({ flavour, onSelect }: { flavour: Flavour; onSelect: () => v
         boxShadow: `0 0 12px rgba(${rgb},0.1)`,
       }}
     >
-      {/* Accent bar */}
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "14px 14px 0 0", background: `rgba(${rgb},${isOut ? 0.2 : 0.85})` }} />
-
       <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "flex-start" }}>
         <span style={{ fontSize: 26 }}>{flavour.emoji}</span>
         {stock !== "normal" && (
@@ -403,7 +404,6 @@ function MobileCard({ flavour, onSelect }: { flavour: Flavour; onSelect: () => v
           }}>{isOut ? "OUT" : "LOW"}</span>
         )}
       </div>
-
       <div style={{ fontFamily: "var(--font-bebas)", fontSize: 15, letterSpacing: "0.04em", color: accent, lineHeight: 1.1 }}>{flavour.name}</div>
       <div style={{ fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(200,195,230,0.5)" }}>{flavour.category}</div>
       <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: accent, fontWeight: 700, marginTop: 2 }}>{kes(flavour.price)}</div>
@@ -419,9 +419,10 @@ function DesktopWall({
   category: string;
   onSelect: (f: Flavour) => void;
 }) {
-  const [layout, setLayout]       = useState<Layout>("SPHERE");
   const [targetLayout, setTarget] = useState<Layout>("SPHERE");
   const [morphing, setMorphing]   = useState(false);
+  // Track displayed count for stage height
+  const [visibleCount, setVisibleCount] = useState(FLAVOURS.length);
 
   const sceneRef  = useRef<HTMLDivElement>(null);
   const cardRefs  = useRef<(HTMLDivElement | null)[]>([]);
@@ -435,19 +436,93 @@ function DesktopWall({
   const lastPointer    = useRef({ x: 0, y: 0 });
   const rafOrbit       = useRef<number>(0);
   const currentLayout  = useRef<Layout>("SPHERE");
+  // Track current category for cross-effect use in morphTo
+  const currentCategory = useRef<string>("All");
 
-  useLayoutEffect(() => {
-    const plist = spherePos();
-    cardRefs.current.forEach((el, i) => {
-      if (!el || !plist[i]) return;
-      const p = plist[i];
-      gsap.set(el, { x: p.x + OFFSET_X, y: p.y + OFFSET_Y, z: p.z, rotationX: p.rx, rotationY: p.ry, rotationZ: p.rz, opacity: 1, scale: 1 });
-    });
+  // Apply positions for a subset of flavours to their elements
+  const applyPositions = useCallback((
+    visibleIndices: number[],
+    layout: Layout,
+    animate: boolean,
+    onDone?: () => void,
+  ) => {
+    const positions = layout === "SPHERE"
+      ? computeSpherePos(visibleIndices.length)
+      : computeHelixPos(visibleIndices.length);
+
+    const hiddenIndices = FLAVOURS.map((_, i) => i).filter(i => !visibleIndices.includes(i));
+
+    // Kill existing tweens on all cards
+    cardRefs.current.forEach(el => { if (el) gsap.killTweensOf(el); });
+
+    if (animate) {
+      // Hide cards that are not in the visible set — shrink to centre
+      hiddenIndices.forEach(i => {
+        const el = cardRefs.current[i];
+        if (!el) return;
+        gsap.to(el, { x: OFFSET_X, y: OFFSET_Y, z: 0, rotationX: 0, rotationY: 0, rotationZ: 0, scale: 0, opacity: 0, duration: 0.3, ease: "power2.in" });
+        el.style.pointerEvents = "none";
+      });
+
+      // Animate visible cards to their new positions with stagger
+      visibleIndices.forEach((globalIdx, slot) => {
+        const el = cardRefs.current[globalIdx];
+        const p = positions[slot];
+        if (!el || !p) return;
+        gsap.to(el, {
+          x: p.x + OFFSET_X, y: p.y + OFFSET_Y, z: p.z,
+          rotationX: p.rx, rotationY: p.ry, rotationZ: p.rz,
+          scale: 1, opacity: 1,
+          duration: 0.55,
+          delay: slot * 0.012,
+          ease: "power3.out",
+        });
+        el.style.pointerEvents = "auto";
+      });
+
+      if (onDone) setTimeout(onDone, visibleIndices.length * 12 + 600);
+    } else {
+      // Instant set (initial load)
+      hiddenIndices.forEach(i => {
+        const el = cardRefs.current[i];
+        if (!el) return;
+        gsap.set(el, { x: OFFSET_X, y: OFFSET_Y, z: 0, scale: 0, opacity: 0 });
+        el.style.pointerEvents = "none";
+      });
+      visibleIndices.forEach((globalIdx, slot) => {
+        const el = cardRefs.current[globalIdx];
+        const p = positions[slot];
+        if (!el || !p) return;
+        gsap.set(el, { x: p.x + OFFSET_X, y: p.y + OFFSET_Y, z: p.z, rotationX: p.rx, rotationY: p.ry, rotationZ: p.rz, scale: 1, opacity: 1 });
+        el.style.pointerEvents = "auto";
+      });
+      if (onDone) onDone();
+    }
   }, []);
 
+  // Build visible indices from category
+  const getVisibleIndices = useCallback((cat: string) => {
+    return FLAVOURS.map((f, i) => ({ f, i }))
+      .filter(({ f }) => cat === "All" || f.category === cat)
+      .map(({ i }) => i);
+  }, []);
+
+  // Initial mount — sphere, all flavours, no animation
+  useLayoutEffect(() => {
+    const indices = getVisibleIndices("All");
+    applyPositions(indices, "SPHERE", false);
+    // Fade in with stagger
+    indices.forEach((globalIdx, slot) => {
+      const el = cardRefs.current[globalIdx];
+      if (!el) return;
+      gsap.fromTo(el, { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1, duration: 0.5, delay: slot * 0.01, ease: "power3.out" });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // RAF orbit loop
   useEffect(() => {
     let running = true;
-    let idle = false;
     const loop = () => {
       if (!running) return;
       rafOrbit.current = requestAnimationFrame(loop);
@@ -463,12 +538,7 @@ function DesktopWall({
       const dy = targetOrbitRef.current.y - orbitRef.current.y;
       const speed = Math.abs(velRef.current.x) + Math.abs(velRef.current.y);
 
-      // Skip DOM write and go idle when nothing is moving
-      if (!isDragging.current && speed < 0.01 && Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) {
-        if (!idle) { idle = true; }
-        return;
-      }
-      idle = false;
+      if (!isDragging.current && speed < 0.01 && Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) return;
 
       orbitRef.current.x += dx * 0.1;
       orbitRef.current.y += dy * 0.1;
@@ -480,40 +550,32 @@ function DesktopWall({
     return () => { running = false; cancelAnimationFrame(rafOrbit.current); };
   }, []);
 
+  // Category change — re-layout the visible subset
+  useEffect(() => {
+    currentCategory.current = category;
+    const indices = getVisibleIndices(category);
+    setVisibleCount(indices.length);
+    applyPositions(indices, currentLayout.current, true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category]);
+
   const morphTo = useCallback((next: Layout) => {
     if (morphing || next === currentLayout.current) return;
     setMorphing(true);
     setTarget(next);
-    const doMorph = () => {
-      const plist = getPositions(next);
-      const els = cardRefs.current;
-      const validEls = els.filter(Boolean) as HTMLDivElement[];
-      validEls.forEach(el => gsap.killTweensOf(el));
 
-      // Phase 1: collapse all at once with stagger via GSAP timeline
-      const tl = gsap.timeline({
-        onComplete: () => {
-          // Reposition all cards instantly while invisible
-          validEls.forEach((el, i) => {
-            const p = plist[els.indexOf(el)];
-            if (!p) return;
-            gsap.set(el, { x: p.x + OFFSET_X, y: p.y + OFFSET_Y, z: p.z, rotationX: p.rx, rotationY: p.ry, rotationZ: p.rz });
-          });
-          // Phase 2: reveal with stagger
-          gsap.to(validEls, {
-            scale: 1, opacity: 1, duration: 0.7, stagger: 0.01, ease: "power3.out",
-            onComplete: () => { currentLayout.current = next; setLayout(next); setMorphing(false); },
-          });
-        },
+    const doMorph = () => {
+      const indices = getVisibleIndices(currentCategory.current);
+      applyPositions(indices, next, true, () => {
+        currentLayout.current = next;
+        setMorphing(false);
       });
-      tl.to(validEls, { scale: 0.001, opacity: 0, duration: 0.2, stagger: 0.008, ease: "power2.in" });
     };
-    if ((currentLayout.current === "SPHERE" && next === "HELIX") || (currentLayout.current === "HELIX" && next === "SPHERE")) {
-      gsap.to(targetOrbitRef.current, { x: 0, y: 0, duration: 0.8, ease: "power3.out", onComplete: doMorph });
-    } else {
-      doMorph();
-    }
-  }, [morphing]);
+
+    // Reset orbit first, then morph
+    gsap.to(targetOrbitRef.current, { x: 0, y: 0, duration: 0.6, ease: "power3.out", onComplete: doMorph });
+    gsap.to(orbitRef.current, { x: 0, y: 0, duration: 0.6, ease: "power3.out" });
+  }, [morphing, getVisibleIndices, applyPositions]);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0 && e.pointerType === "mouse") return;
@@ -541,15 +603,11 @@ function DesktopWall({
 
   const onPointerUp = useCallback(() => { pointerIsDown.current = false; isDragging.current = false; }, []);
 
-  useEffect(() => {
-    cardRefs.current.forEach((el, i) => {
-      if (!el) return;
-      const f = FLAVOURS[i];
-      const visible = category === "All" || f.category === category;
-      gsap.to(el, { opacity: visible ? 1 : 0, scale: visible ? 1 : 0.5, duration: 0.35, ease: "power2.out" });
-      el.style.pointerEvents = visible ? "auto" : "none";
-    });
-  }, [category]);
+  // Stage height: clamp based on current visible count and layout
+  const stageHeight = useMemo(() => {
+    if (targetLayout === "HELIX") return Math.max(800, Math.min(2000, visibleCount * 44 + 200));
+    return Math.max(700, Math.min(1300, 300 + visibleCount * 26));
+  }, [targetLayout, visibleCount]);
 
   return (
     <div>
@@ -582,7 +640,7 @@ function DesktopWall({
         {LAYOUT_META[targetLayout].hint}
       </p>
 
-      {/* 3D Stage — height must contain whatever layout is active */}
+      {/* 3D Stage */}
       <div
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -590,7 +648,7 @@ function DesktopWall({
         onPointerLeave={onPointerUp}
         style={{
           position: "relative", zIndex: 5, width: "100%",
-          height: targetLayout === "HELIX" ? 2000 : 1300,
+          height: stageHeight,
           overflow: "hidden",
           perspective: "2200px", perspectiveOrigin: "50% 50%",
           touchAction: "none", marginTop: 0, userSelect: "none",
@@ -617,7 +675,7 @@ function DesktopWall({
       </div>
 
       <p style={{ textAlign: "center", padding: "28px 0 clamp(16px,3vw,32px)", fontFamily: "var(--font-mono)", fontSize: 9, color: "rgba(255,255,255,0.16)", letterSpacing: "0.16em", textTransform: "uppercase" }}>
-        {category === "All" ? FLAVOURS.length : FLAVOURS.filter(f => f.category === category).length} blends · {layout.toLowerCase()} view
+        {visibleCount} blends · {targetLayout.toLowerCase()} view
         {morphing && " · morphing..."}
       </p>
     </div>
@@ -672,8 +730,6 @@ export default function FlavourWall() {
         background: "var(--void)",
         position: "relative",
         overflow: "hidden",
-        // Critical: do NOT set minHeight on mobile — let content determine height
-        minHeight: isMobile ? "auto" : "auto",
         paddingBottom: isMobile ? 0 : "clamp(60px,8vw,120px)",
       }}
     >
