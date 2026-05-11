@@ -420,7 +420,7 @@ const SessionModal = memo(function SessionModal({
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = `${style.accent}40`; }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = `${style.accent}20`; }}
             >
-              {session.isCustom ? "Open Wizard →" : "Book This →"}
+              {session.isCustom ? "Build Your Night →" : "Claim This Night →"}
             </button>
           </div>
         </div>
@@ -601,7 +601,7 @@ function DesktopSessions({ onSelect }: { onSelect: (s: SessionTier) => void }) {
           color: "rgba(255,255,255,0.14)", textTransform: "uppercase",
           marginTop: 10, paddingLeft: 2,
         }}>
-          Select to preview · click door or enter to open
+          Choose a door · step through · own the night
         </p>
       </div>
 
@@ -719,7 +719,7 @@ function DesktopSessions({ onSelect }: { onSelect: (s: SessionTier) => void }) {
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = `${activeStyle.accent}40`; }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = `${activeStyle.accent}1e`; }}
             >
-              {activeSession.isCustom ? "Open Wizard →" : "Enter →"}
+              {activeSession.isCustom ? "Build Your Night →" : "Open the Door →"}
             </button>
           </div>
         </div>
@@ -775,24 +775,25 @@ export default function SessionsSection() {
           fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.3em",
           color: "var(--cyan-bright)", textTransform: "uppercase", marginBottom: 10, opacity: 0.8,
         }}>
-          8 Ways to Session
+          Eight Doors. Eight Worlds.
         </p>
         <h2 style={{
           fontFamily: "var(--font-bebas)", fontWeight: 400,
           fontSize: isMobile ? "clamp(44px,11vw,64px)" : "clamp(56px,7vw,96px)",
           lineHeight: 0.92, letterSpacing: "0.04em", color: "#fff", marginBottom: 12,
         }}>
-          Pick Your <span style={{ color: "var(--violet)" }}>Vibe.</span>
+          Every Night Deserves<br />
+          <span style={{ color: "var(--violet)" }}>The Right Door.</span>
         </h2>
         <p style={{
           fontFamily: "var(--font-barlow)",
           fontSize: isMobile ? 13 : "clamp(13px,1.6vw,16px)",
           color: "rgba(255,255,255,0.38)",
-          maxWidth: 420, margin: isMobile ? "0" : "0 auto",
+          maxWidth: 460, margin: isMobile ? "0" : "0 auto",
         }}>
           {isMobile
-            ? "Tap a session to see what's inside."
-            : "Select a session. The door will open. Step inside."}
+            ? "Behind every door is a world built for a different kind of night. Find yours."
+            : "Behind every door is a different world — a different energy, a different crew, a different night. Choose yours and step through."}
         </p>
       </div>
 
@@ -821,7 +822,7 @@ export default function SessionsSection() {
           fontFamily: "var(--font-serif, var(--font-grotesk))", fontStyle: "italic",
           fontSize: 12, color: "rgba(255,255,255,0.13)", letterSpacing: "0.06em",
         }}>
-          All sessions include setup · teardown · premium coal management · Nairobi delivery
+          Every door opens the same promise — premium setup, flawless service, and a night worth remembering.
         </p>
       </div>
     </section>
