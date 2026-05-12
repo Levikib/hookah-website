@@ -231,6 +231,23 @@ function OrbitController({
   return null;
 }
 
+// ─── Behind-door light that pours through as it opens ────────────────────────
+function DoorLight({ color, intensity }: { color: string; intensity: number }) {
+  const ref = useRef<THREE.PointLight>(null!);
+  useFrame(() => {
+    if (ref.current) ref.current.intensity = intensity;
+  });
+  return (
+    <pointLight
+      ref={ref}
+      position={[0, 0, -0.6]}
+      intensity={intensity}
+      distance={6}
+      color={color}
+    />
+  );
+}
+
 // ─── The persistent 3D scene ──────────────────────────────────────────────────
 function DoorScene({
   sessionId,
@@ -241,23 +258,22 @@ function DoorScene({
   openTrigger: number;
   onOpenComplete: () => void;
 }) {
-  const style    = SESSION_STYLE[sessionId];
-  const outerRef = useRef<THREE.Group>(null!);
-  const floatRef = useRef<THREE.Group>(null!);
-  const pivotRef = useRef<THREE.Group>(null!);
+  const style      = SESSION_STYLE[sessionId];
+  const outerRef   = useRef<THREE.Group>(null!); // orbit
+  const floatRef   = useRef<THREE.Group>(null!); // float
+  const hingeWrap  = useRef<THREE.Group>(null!); // translate to left edge
+  const pivotRef   = useRef<THREE.Group>(null!); // actual hinge rotation
+  const doorLightRef = useRef<THREE.PointLight>(null!);
+  const glowDiscRef  = useRef<THREE.Mesh>(null!);
   const [loaded, setLoaded] = useState(false);
 
-  // Use refs for all "gate" state so useEffect never closes over stale values
-  const readyRef    = useRef(false);
-  const isOpen      = useRef(false);
-  const autoRot     = useRef(true);
-  // Separate drag orbit from auto-rotation so they don't fight each other
-  const dragOrbit   = useRef({ x: 0, y: 0 });   // set by pointer drag
-  const autoAngle   = useRef(0);                   // incremented each frame
+  const isOpen        = useRef(false);
+  const autoRot       = useRef(true);
+  const dragOrbit     = useRef({ x: 0, y: 0 });
+  const autoAngle     = useRef(0);
   const onCompleteRef = useRef(onOpenComplete);
-  const prevId      = useRef(sessionId);
+  const prevId        = useRef(sessionId);
 
-  // Keep callback ref fresh every render — no stale closure
   useEffect(() => { onCompleteRef.current = onOpenComplete; }, [onOpenComplete]);
 
   // Door swap — full reset
@@ -265,74 +281,129 @@ function DoorScene({
     if (prevId.current === sessionId) return;
     prevId.current = sessionId;
     setLoaded(false);
-    readyRef.current = false;
-    autoRot.current  = true;
-    isOpen.current   = false;
+    autoRot.current   = true;
+    isOpen.current    = false;
     dragOrbit.current = { x: 0, y: 0 };
     autoAngle.current = 0;
-    if (pivotRef.current) gsap.set(pivotRef.current.rotation, { y: 0 });
-    if (outerRef.current) gsap.set(outerRef.current.rotation, { x: 0, y: 0 });
+    if (pivotRef.current) { pivotRef.current.rotation.set(0, 0, 0); }
+    if (outerRef.current) { outerRef.current.rotation.set(0, 0, 0); }
   }, [sessionId]);
 
-  // Swing open — fires every time openTrigger increments
+  // ── THE CINEMATIC OPEN SEQUENCE ──────────────────────────────────────────────
   useEffect(() => {
-    if (openTrigger === 0) return;
-    if (isOpen.current) return;
-    if (!pivotRef.current) return;
-    // If model isn't ready yet, swing the placeholder (pivot is always mounted)
+    if (openTrigger === 0 || isOpen.current || !pivotRef.current) return;
     isOpen.current  = true;
     autoRot.current = false;
 
-    // Snap drag offset back to centre so user sees the swing cleanly
+    // Kill drag offset — snap door face-forward before sequence starts
     dragOrbit.current = { x: 0, y: 0 };
+    autoAngle.current = 0;
 
-    gsap.timeline()
-      .to(pivotRef.current.rotation, { y: -Math.PI * 0.65, duration: 0.65, ease: "power3.out" })
-      .call(() => { onCompleteRef.current(); })
-      .to(pivotRef.current.rotation, {
-        y: 0, duration: 0.9, ease: "power2.inOut", delay: 0.5,
-        onComplete: () => { isOpen.current = false; autoRot.current = true; },
-      });
-  }, [openTrigger]);
+    const pivot      = pivotRef.current;
+    const outer      = outerRef.current;
+    const doorLight  = doorLightRef.current;
+    const glowDisc   = glowDiscRef.current;
+    const accent     = style.accent;
 
+    // Snap outer rotation to 0 immediately (face-forward)
+    if (outer) outer.rotation.set(0, 0, 0);
+
+    const tl = gsap.timeline();
+
+    // 1. Micro-shudder — door rattles like something is pushing from behind
+    tl.to(pivot.rotation, { z:  0.04, duration: 0.06, ease: "power1.inOut" })
+      .to(pivot.rotation, { z: -0.04, duration: 0.06, ease: "power1.inOut" })
+      .to(pivot.rotation, { z:  0.025, duration: 0.05, ease: "power1.inOut" })
+      .to(pivot.rotation, { z:  0,    duration: 0.05, ease: "power1.out" });
+
+    // 2. Brief pause — anticipation
+    tl.to({}, { duration: 0.08 });
+
+    // 3. Door swings open — dramatic arc on the left-edge hinge
+    //    Y rotation goes deeply negative (opens toward viewer-left)
+    //    Ease: fast start (power4.out) then settles with a subtle bounce
+    tl.to(pivot.rotation, {
+      y: -Math.PI * 0.78,
+      duration: 0.72,
+      ease: "back.out(0.3)",
+    });
+
+    // 4. Light behind door intensifies as it opens (runs parallel to swing)
+    if (doorLight) {
+      tl.to(doorLight, { intensity: 60, duration: 0.5, ease: "power2.in" }, "-=0.7");
+      tl.to(doorLight, { intensity: 8,  duration: 0.3, ease: "power2.out" }, "+=0.0");
+    }
+
+    // 5. Floor glow pulses
+    if (glowDisc) {
+      tl.to((glowDisc.material as THREE.MeshBasicMaterial), { opacity: 0.55, duration: 0.3, ease: "power2.in" }, "-=0.9");
+      tl.to((glowDisc.material as THREE.MeshBasicMaterial), { opacity: 0.14, duration: 0.5, ease: "power2.out" }, "-=0.2");
+    }
+
+    // 6. Fire modal at peak of swing (door is fully open)
+    tl.call(() => { onCompleteRef.current(); });
+
+    // 7. Door swings back — slower, weighted, with a small bounce at the end
+    tl.to(pivot.rotation, {
+      y: 0,
+      duration: 1.1,
+      ease: "elastic.out(0.6, 0.5)",
+      delay: 0.55,
+      onComplete: () => {
+        isOpen.current  = false;
+        autoRot.current = true;
+      },
+    });
+  }, [openTrigger, style.accent]);
+
+  // RAF loop — float + orbit
   useFrame(({ clock }, delta) => {
     if (!outerRef.current || !floatRef.current) return;
-    const t = clock.getElapsedTime();
-
-    floatRef.current.position.y = Math.sin(t * 0.75) * 0.055;
-
-    // Auto-rotation increments its own angle, never touches dragOrbit
-    if (autoRot.current) autoAngle.current += delta * 0.18;
-
-    // Target rotation = auto angle + drag offset
-    const targetX = dragOrbit.current.x;
-    const targetY = autoAngle.current + dragOrbit.current.y;
-
-    outerRef.current.rotation.x += (targetX - outerRef.current.rotation.x) * 0.12;
-    outerRef.current.rotation.y += (targetY - outerRef.current.rotation.y) * 0.12;
+    floatRef.current.position.y = Math.sin(clock.getElapsedTime() * 0.75) * 0.055;
+    if (autoRot.current) autoAngle.current += delta * 0.15;
+    const tx = dragOrbit.current.x;
+    const ty = autoAngle.current + dragOrbit.current.y;
+    outerRef.current.rotation.x += (tx - outerRef.current.rotation.x) * 0.1;
+    outerRef.current.rotation.y += (ty - outerRef.current.rotation.y) * 0.1;
   });
 
-  const onReady = useCallback(() => {
-    readyRef.current = true;
-    setLoaded(true);
-  }, []);
+  const onReady = useCallback(() => { setLoaded(true); }, []);
+
+  const accentCol = new THREE.Color(style.accent);
 
   return (
     <>
       <LightRig sessionId={sessionId} />
 
-      {/* Floor glow */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.45, 0]}>
+      {/* Hidden light behind door — blazes open during swing */}
+      <group ref={hingeWrap as React.RefObject<THREE.Group>}>
+        <pointLight
+          ref={doorLightRef}
+          position={[0, 0.5, -1]}
+          intensity={0}
+          distance={8}
+          color={style.accent}
+        />
+      </group>
+
+      {/* Floor glow disc */}
+      <mesh ref={glowDiscRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.45, 0]}>
         <circleGeometry args={[1.8, 48]} />
-        <meshBasicMaterial color={new THREE.Color(style.accent)} transparent opacity={0.14} />
+        <meshBasicMaterial color={accentCol} transparent opacity={0.14} />
       </mesh>
 
-      {/* Orbit wrapper → float wrapper → hinge pivot → mesh */}
+      {/* Orbit → float → hinge offset → hinge pivot → mesh */}
       <group ref={outerRef}>
         <group ref={floatRef}>
-          {/* Hinge: translate +0.55 so pivot is at left edge, then rotate */}
-          <group position={[0.55, 0, 0]}>
-            <group ref={pivotRef} position={[-0.55, 0, 0]}>
+          {/*
+            Hinge math:
+            - hingeWrap translates the whole group +X so the pivot is at the
+              door's left edge (approx half the normalised width = 0.65 units)
+            - pivotRef rotates around Y at that left-edge origin
+            - mesh sits at -0.65 inside pivotRef so it stays at world 0
+          */}
+          <group position={[0.65, 0, 0]}>
+            <group ref={pivotRef} position={[-0.65, 0, 0]}>
               {!loaded && <Placeholder color={style.accent} />}
               <Suspense fallback={null}>
                 <DoorMesh sessionId={sessionId} onReady={onReady} />
@@ -356,19 +427,28 @@ const SessionModal = memo(function SessionModal({
   const panelRef   = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    gsap.fromTo(overlayRef.current, { opacity: 0 }, { opacity: 1, duration: 0.22 });
-    gsap.fromTo(panelRef.current,   { y: 60, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1, duration: 0.42, ease: "back.out(1.5)" });
+    // Flash white → fade to dark overlay — feels like stepping through the door into light
+    gsap.fromTo(overlayRef.current,
+      { opacity: 0, background: `rgba(255,255,255,0.95)` },
+      { opacity: 1, background: "rgba(0,0,0,0.88)", duration: 0.55, ease: "power3.out" }
+    );
+    // Panel: starts small + invisible, expands with spring
+    gsap.fromTo(panelRef.current,
+      { scale: 0.78, opacity: 0, y: 20, rotateX: 12 },
+      { scale: 1,    opacity: 1, y: 0,  rotateX: 0, duration: 0.55, ease: "back.out(1.8)", delay: 0.1 }
+    );
   }, []);
 
   const close = useCallback(() => {
-    gsap.to(overlayRef.current, { opacity: 0, duration: 0.16 });
-    gsap.to(panelRef.current,   { y: 30, opacity: 0, scale: 0.97, duration: 0.16, onComplete: onClose });
+    gsap.to(overlayRef.current, { opacity: 0, duration: 0.2, ease: "power2.in" });
+    gsap.to(panelRef.current,   { scale: 0.88, opacity: 0, y: 16, duration: 0.2, ease: "power2.in", onComplete: onClose });
   }, [onClose]);
 
   return (
     <div ref={overlayRef} onClick={e => e.target === overlayRef.current && close()}
       style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.88)",
-        display: "flex", alignItems: "center", justifyContent: "center", padding: 16, overflowY: "auto" }}>
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 16, overflowY: "auto",
+        perspective: 1200 }}>
       <div ref={panelRef} style={{
         width: "min(600px,100%)",
         background: "linear-gradient(160deg,#0e0a22,#08041a)",
