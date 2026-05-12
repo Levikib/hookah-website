@@ -617,12 +617,8 @@ function DesktopSessions({ onBook }: { onBook: (s: SessionTier) => void }) {
   }, [activeId, activeStyle]);
 
   const handleCardClick = useCallback((session: SessionTier) => {
-    if (session.id !== activeId) {
-      setActiveId(session.id);
-    } else {
-      setOpenTrigger(t => t + 1);
-    }
-  }, [activeId]);
+    setActiveId(session.id);
+  }, []);
 
   const handleEnterButton = useCallback(() => {
     setOpenTrigger(t => t + 1);
