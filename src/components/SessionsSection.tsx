@@ -173,26 +173,28 @@ function LightRig({ sessionId }: { sessionId: string }) {
   );
 }
 
-// ─── Orbit controller — mouse drag rotates door, scroll is never intercepted ──
+// ─── Orbit controller — pointer drag on canvas, never intercepts scroll ───────
 function OrbitController({
-  orbitRef,
+  dragOrbit,
   autoRotRef,
 }: {
-  orbitRef: React.MutableRefObject<{ x: number; y: number }>;
+  dragOrbit: React.MutableRefObject<{ x: number; y: number }>;
   autoRotRef: React.MutableRefObject<boolean>;
 }) {
   const { gl } = useThree();
 
   useEffect(() => {
     const canvas = gl.domElement;
-    let dragging  = false;
+    let dragging = false;
     let lastX = 0, lastY = 0;
+    let resumeTimer: ReturnType<typeof setTimeout> | null = null;
 
     const onDown = (e: PointerEvent) => {
       dragging = true;
       lastX = e.clientX;
       lastY = e.clientY;
       autoRotRef.current = false;
+      if (resumeTimer) clearTimeout(resumeTimer);
       canvas.setPointerCapture(e.pointerId);
     };
 
@@ -202,29 +204,29 @@ function OrbitController({
       const dy = e.clientY - lastY;
       lastX = e.clientX;
       lastY = e.clientY;
-      orbitRef.current.x += dy * 0.008;
-      orbitRef.current.y += dx * 0.008;
-      // Clamp vertical tilt so door never flips upside down
-      orbitRef.current.x = Math.max(-0.9, Math.min(0.9, orbitRef.current.x));
+      dragOrbit.current.x += dy * 0.008;
+      dragOrbit.current.y += dx * 0.008;
+      dragOrbit.current.x = Math.max(-0.9, Math.min(0.9, dragOrbit.current.x));
     };
 
     const onUp = () => {
+      if (!dragging) return;
       dragging = false;
-      // Resume auto-rotation 1.5s after letting go
-      setTimeout(() => { autoRotRef.current = true; }, 1500);
+      resumeTimer = setTimeout(() => { autoRotRef.current = true; }, 1500);
     };
 
-    canvas.addEventListener("pointerdown", onDown);
-    canvas.addEventListener("pointermove", onMove);
-    canvas.addEventListener("pointerup",   onUp);
+    canvas.addEventListener("pointerdown",   onDown);
+    canvas.addEventListener("pointermove",   onMove);
+    canvas.addEventListener("pointerup",     onUp);
     canvas.addEventListener("pointercancel", onUp);
     return () => {
-      canvas.removeEventListener("pointerdown", onDown);
-      canvas.removeEventListener("pointermove", onMove);
-      canvas.removeEventListener("pointerup",   onUp);
+      canvas.removeEventListener("pointerdown",   onDown);
+      canvas.removeEventListener("pointermove",   onMove);
+      canvas.removeEventListener("pointerup",     onUp);
       canvas.removeEventListener("pointercancel", onUp);
+      if (resumeTimer) clearTimeout(resumeTimer);
     };
-  }, [gl, orbitRef, autoRotRef]);
+  }, [gl, dragOrbit, autoRotRef]);
 
   return null;
 }
@@ -240,67 +242,80 @@ function DoorScene({
   onOpenComplete: () => void;
 }) {
   const style    = SESSION_STYLE[sessionId];
-  const outerRef = useRef<THREE.Group>(null!); // orbit angles applied here
-  const floatRef = useRef<THREE.Group>(null!); // vertical float
-  const pivotRef = useRef<THREE.Group>(null!); // hinge (swing open)
+  const outerRef = useRef<THREE.Group>(null!);
+  const floatRef = useRef<THREE.Group>(null!);
+  const pivotRef = useRef<THREE.Group>(null!);
   const [loaded, setLoaded] = useState(false);
-  const [ready,  setReady]  = useState(false);
-  const prevId   = useRef(sessionId);
-  const isOpen   = useRef(false);
-  const autoRot  = useRef(true);
-  const orbitRot = useRef({ x: 0, y: 0 }); // accumulated drag rotation
 
-  // Door swap — reset state
+  // Use refs for all "gate" state so useEffect never closes over stale values
+  const readyRef    = useRef(false);
+  const isOpen      = useRef(false);
+  const autoRot     = useRef(true);
+  // Separate drag orbit from auto-rotation so they don't fight each other
+  const dragOrbit   = useRef({ x: 0, y: 0 });   // set by pointer drag
+  const autoAngle   = useRef(0);                   // incremented each frame
+  const onCompleteRef = useRef(onOpenComplete);
+  const prevId      = useRef(sessionId);
+
+  // Keep callback ref fresh every render — no stale closure
+  useEffect(() => { onCompleteRef.current = onOpenComplete; }, [onOpenComplete]);
+
+  // Door swap — full reset
   useEffect(() => {
     if (prevId.current === sessionId) return;
     prevId.current = sessionId;
     setLoaded(false);
-    setReady(false);
-    autoRot.current = true;
-    isOpen.current  = false;
-    orbitRot.current = { x: 0, y: 0 };
+    readyRef.current = false;
+    autoRot.current  = true;
+    isOpen.current   = false;
+    dragOrbit.current = { x: 0, y: 0 };
+    autoAngle.current = 0;
     if (pivotRef.current) gsap.set(pivotRef.current.rotation, { y: 0 });
     if (outerRef.current) gsap.set(outerRef.current.rotation, { x: 0, y: 0 });
   }, [sessionId]);
 
-  // Swing open
+  // Swing open — fires every time openTrigger increments
   useEffect(() => {
-    if (openTrigger === 0 || !ready || !pivotRef.current) return;
+    if (openTrigger === 0) return;
     if (isOpen.current) return;
+    if (!pivotRef.current) return;
+    // If model isn't ready yet, swing the placeholder (pivot is always mounted)
     isOpen.current  = true;
     autoRot.current = false;
 
-    // Snap orbit back to front before swinging so user sees it clearly
-    gsap.to(orbitRot.current, { x: 0, y: 0, duration: 0.3, ease: "power2.out" });
+    // Snap drag offset back to centre so user sees the swing cleanly
+    dragOrbit.current = { x: 0, y: 0 };
 
     gsap.timeline()
       .to(pivotRef.current.rotation, { y: -Math.PI * 0.65, duration: 0.65, ease: "power3.out" })
-      .call(() => onOpenComplete())
+      .call(() => { onCompleteRef.current(); })
       .to(pivotRef.current.rotation, {
         y: 0, duration: 0.9, ease: "power2.inOut", delay: 0.5,
         onComplete: () => { isOpen.current = false; autoRot.current = true; },
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openTrigger]);
 
   useFrame(({ clock }, delta) => {
     if (!outerRef.current || !floatRef.current) return;
     const t = clock.getElapsedTime();
 
-    // Gentle vertical float
     floatRef.current.position.y = Math.sin(t * 0.75) * 0.055;
 
-    // Auto slow Y rotation when not dragging / swinging
-    if (autoRot.current) {
-      orbitRot.current.y += delta * 0.18;
-    }
+    // Auto-rotation increments its own angle, never touches dragOrbit
+    if (autoRot.current) autoAngle.current += delta * 0.18;
 
-    // Apply orbit smoothly (lerp toward target each frame)
-    outerRef.current.rotation.x += (orbitRot.current.x - outerRef.current.rotation.x) * 0.12;
-    outerRef.current.rotation.y += (orbitRot.current.y - outerRef.current.rotation.y) * 0.12;
+    // Target rotation = auto angle + drag offset
+    const targetX = dragOrbit.current.x;
+    const targetY = autoAngle.current + dragOrbit.current.y;
+
+    outerRef.current.rotation.x += (targetX - outerRef.current.rotation.x) * 0.12;
+    outerRef.current.rotation.y += (targetY - outerRef.current.rotation.y) * 0.12;
   });
 
-  const onReady = useCallback(() => { setReady(true); setLoaded(true); }, []);
+  const onReady = useCallback(() => {
+    readyRef.current = true;
+    setLoaded(true);
+  }, []);
 
   return (
     <>
@@ -327,7 +342,7 @@ function DoorScene({
         </group>
       </group>
 
-      <OrbitController orbitRef={orbitRot} autoRotRef={autoRot} />
+      <OrbitController dragOrbit={dragOrbit} autoRotRef={autoRot} />
     </>
   );
 }
