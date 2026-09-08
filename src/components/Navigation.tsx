@@ -22,6 +22,7 @@ export default function Navigation() {
   const prevCartCount = useRef(cartCount);
   const setCartOpen  = useStore((s) => s.setCartOpen);
   const setBookingOpen = useStore((s) => s.setBookingOpen);
+  const resetBooking   = useStore((s) => s.resetBooking);
 
   // Ember indicator refs
   const emberRef     = useRef<HTMLDivElement>(null);
@@ -255,7 +256,7 @@ export default function Navigation() {
           {/* Book Now — desktop only */}
           {!isMobile && (
             <button
-              onClick={() => setBookingOpen(true)}
+              onClick={() => { resetBooking(); setBookingOpen(true); }}
               className="btn-teal"
               style={{ fontSize: 13, padding: "10px 20px", minHeight: 44 }}
             >
@@ -418,6 +419,7 @@ export default function Navigation() {
             onClick={() => {
               setMenuOpen(false);
               animateHamburgerOpen(false);
+              resetBooking();
               setBookingOpen(true);
             }}
             className="btn-teal"

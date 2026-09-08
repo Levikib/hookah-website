@@ -3,7 +3,7 @@ import React, {
   useRef, useEffect, useState, useCallback, memo, Suspense,
 } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, useAnimations } from "@react-three/drei";
 import { gsap } from "gsap";
 import * as THREE from "three";
 import { SESSIONS, type SessionTier } from "@/data/sessions";
@@ -29,56 +29,56 @@ const SESSION_STYLE: Record<string, {
   ambientIntensity: number;
 }> = {
   solo: {
-    model: "/models/door_solo.glb", accent: "#f59e0b",
+    model: "/models/door_solo_rigged.glb", accent: "#f59e0b",
     bg: "radial-gradient(ellipse 160% 120% at 50% 90%, #3d2200 0%, #1a0e00 45%, #05030a 100%)",
     keyColor: "#fff3d0", fillColor: "#f59e0b", rimColor: "#7c3aed",
     keyIntensity: 38, fillIntensity: 26, ambientIntensity: 0.55,
   },
   duo: {
-    model: "/models/door_duo.glb", accent: "#68d391",
+    model: "/models/door_duo_rigged.glb", accent: "#68d391",
     bg: "radial-gradient(ellipse 160% 120% at 50% 90%, #004020 0%, #001a0a 45%, #05030a 100%)",
     keyColor: "#e0fff0", fillColor: "#68d391", rimColor: "#276749",
     keyIntensity: 50, fillIntensity: 38, ambientIntensity: 0.75,
   },
   squad: {
-    model: "/models/door_squad.glb", accent: "#22d3ee",
+    model: "/models/door_squad_rigged.glb", accent: "#22d3ee",
     bg: "radial-gradient(ellipse 160% 120% at 50% 90%, #003d4d 0%, #001820 45%, #05030a 100%)",
     keyColor: "#e0faff", fillColor: "#22d3ee", rimColor: "#0891b2",
     keyIntensity: 55, fillIntensity: 42, ambientIntensity: 0.85,
   },
   vip: {
-    model: "/models/door_vip.glb", accent: "#f6c90e",
+    model: "/models/door_vip_rigged.glb", accent: "#f6c90e",
     bg: "radial-gradient(ellipse 160% 120% at 50% 90%, #3a2e00 0%, #181200 45%, #05030a 100%)",
     keyColor: "#fffbe0", fillColor: "#f6c90e", rimColor: "#b7791f",
     keyIntensity: 36, fillIntensity: 24, ambientIntensity: 0.5,
   },
   rooftop: {
-    model: "/models/door_rooftop.glb", accent: "#b794f4",
+    model: "/models/door_rooftop_rigged.glb", accent: "#b794f4",
     bg: "radial-gradient(ellipse 160% 120% at 50% 90%, #261040 0%, #0f0620 45%, #05030a 100%)",
     keyColor: "#f0e8ff", fillColor: "#b794f4", rimColor: "#553c9a",
     keyIntensity: 44, fillIntensity: 32, ambientIntensity: 0.65,
   },
   corporate: {
-    model: "/models/door_corporate.glb", accent: "#63b3ed",
+    model: "/models/door_corporate_rigged.glb", accent: "#63b3ed",
     bg: "radial-gradient(ellipse 160% 120% at 50% 90%, #002540 0%, #001020 45%, #05030a 100%)",
     keyColor: "#dff0ff", fillColor: "#63b3ed", rimColor: "#2b6cb0",
     keyIntensity: 52, fillIntensity: 40, ambientIntensity: 0.8,
   },
   wedding: {
-    model: "/models/door_wedding.glb", accent: "#f687b3",
+    model: "/models/door_wedding_rigged.glb", accent: "#f687b3",
     bg: "radial-gradient(ellipse 160% 120% at 50% 90%, #3d0028 0%, #1a0012 45%, #05030a 100%)",
     keyColor: "#ffe8f3", fillColor: "#f687b3", rimColor: "#b83280",
     keyIntensity: 40, fillIntensity: 28, ambientIntensity: 0.6,
   },
   custom: {
-    model: "/models/door_custom.glb", accent: "#ff6b35",
+    model: "/models/door_custom_rigged.glb", accent: "#ff6b35",
     bg: "radial-gradient(ellipse 160% 120% at 50% 90%, #3d1500 0%, #1a0800 45%, #05030a 100%)",
     keyColor: "#fff0e8", fillColor: "#ff6b35", rimColor: "#7c3aed",
     keyIntensity: 42, fillIntensity: 30, ambientIntensity: 0.6,
   },
 };
 
-useGLTF.preload(SESSION_STYLE["solo"].model);
+// No module-level preloads — deferred until section enters viewport
 
 const _box    = new THREE.Box3();
 const _size   = new THREE.Vector3();
@@ -97,39 +97,82 @@ function normaliseModel(group: THREE.Group, targetH = 2.8) {
   group.position.y += 0.05;
 }
 
-// ─── Door mesh ────────────────────────────────────────────────────────────────
-function DoorMesh({ sessionId, onReady }: { sessionId: string; onReady: () => void }) {
-  const { scene } = useGLTF(SESSION_STYLE[sessionId].model);
-  const ref    = useRef<THREE.Group>(null!);
-  const scaled = useRef(false);
+// ─── Rigged door mesh — uses baked armature animation clips ──────────────────
+function DoorMesh({ sessionId, open, onReady, onOpenDone }: {
+  sessionId: string;
+  open: boolean;
+  onReady: () => void;
+  onOpenDone: () => void;
+}) {
+  // useAnimations requires the scene itself (not a clone) as the root
+  const { scene, animations } = useGLTF(SESSION_STYLE[sessionId].model);
+  const groupRef = useRef<THREE.Group>(null!);
+  const { actions, mixer } = useAnimations(animations, groupRef);
+  const readyFired  = useRef(false);
+  const prevOpen    = useRef(false);
+  const openDoneFired = useRef(false);
 
-  const cloned = React.useMemo(() => {
-    const c = scene.clone(true);
-    c.traverse(obj => {
+  // Boost materials
+  useEffect(() => {
+    scene.traverse(obj => {
       if ((obj as THREE.Mesh).isMesh) {
-        const mesh = obj as THREE.Mesh;
-        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        const mats = Array.isArray((obj as THREE.Mesh).material)
+          ? (obj as THREE.Mesh).material as THREE.MeshStandardMaterial[]
+          : [(obj as THREE.Mesh).material as THREE.MeshStandardMaterial];
         mats.forEach(m => {
-          const mat = m as THREE.MeshStandardMaterial;
-          mat.side = THREE.FrontSide;
-          // Boost material responsiveness so lights actually show up on dark models
-          mat.roughness  = Math.min(mat.roughness,  0.72);
-          mat.metalness  = Math.max(mat.metalness,  0.10);
-          mat.needsUpdate = true;
+          m.side = THREE.FrontSide;
+          m.roughness = Math.min(m.roughness ?? 0.8, 0.72);
+          m.metalness = Math.max(m.metalness ?? 0, 0.10);
+          m.needsUpdate = true;
         });
       }
     });
-    return c;
   }, [scene]);
 
+  // Normalise scale once
   useEffect(() => {
-    if (!ref.current || scaled.current) return;
-    scaled.current = true;
-    normaliseModel(ref.current);
+    if (!groupRef.current || readyFired.current) return;
+    readyFired.current = true;
+    normaliseModel(groupRef.current);
     onReady();
-  }, [cloned, onReady]);
+  }, [scene, onReady]);
 
-  return <group ref={ref}><primitive object={cloned} /></group>;
+  // Find the correct clip — named "{sessionId}_armatureAction" (no suffix)
+  const clipName = `door_${sessionId}_armatureAction`;
+
+  // Play open or close
+  useEffect(() => {
+    if (!mixer) return;
+    const action = actions[clipName];
+    if (!action) return;
+
+    action.clampWhenFinished = true;
+    action.loop = THREE.LoopOnce;
+
+    if (open && !prevOpen.current) {
+      openDoneFired.current = false;
+      action.timeScale = 1;
+      action.reset().play();
+      // Fire onOpenDone after clip finishes opening (1.5s = frames 1→36 at 24fps)
+      const dur = action.getClip().duration;
+      // Open is first third of clip (closed→open→hold→close), open arrives at ~35%
+      const openMs = (dur * 0.35) * 1000;
+      setTimeout(() => {
+        if (!openDoneFired.current) { openDoneFired.current = true; onOpenDone(); }
+      }, Math.max(openMs, 800));
+    } else if (!open && prevOpen.current) {
+      action.timeScale = -1;
+      action.time = action.getClip().duration * 0.36; // rewind from open position
+      action.play();
+    }
+    prevOpen.current = open;
+  }, [open, actions, clipName, mixer, onOpenDone]);
+
+  return (
+    <group ref={groupRef}>
+      <primitive object={scene} />
+    </group>
+  );
 }
 
 // ─── Pulsing placeholder ──────────────────────────────────────────────────────
@@ -252,114 +295,80 @@ function DoorLight({ color, intensity }: { color: string; intensity: number }) {
 function DoorScene({
   sessionId,
   openTrigger,
+  closeSignal,
   onOpenComplete,
 }: {
   sessionId: string;
   openTrigger: number;
+  closeSignal: number;
   onOpenComplete: () => void;
 }) {
-  const style      = SESSION_STYLE[sessionId];
-  const outerRef   = useRef<THREE.Group>(null!); // orbit
-  const floatRef   = useRef<THREE.Group>(null!); // float
-  const hingeWrap  = useRef<THREE.Group>(null!); // translate to left edge
-  const pivotRef   = useRef<THREE.Group>(null!); // actual hinge rotation
+  const style        = SESSION_STYLE[sessionId];
+  const outerRef     = useRef<THREE.Group>(null!);
+  const floatRef     = useRef<THREE.Group>(null!);
   const doorLightRef = useRef<THREE.PointLight>(null!);
   const glowDiscRef  = useRef<THREE.Mesh>(null!);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded,  setLoaded]  = useState(false);
+  const [isOpen,  setIsOpen]  = useState(false);
 
-  const isOpen        = useRef(false);
-  const autoRot       = useRef(true);
-  const dragOrbit     = useRef({ x: 0, y: 0 });
-  const autoAngle     = useRef(0);
+  const autoRot   = useRef(true);
+  const dragOrbit = useRef({ x: 0, y: 0 });
+  const autoAngle = useRef(0);
   const onCompleteRef = useRef(onOpenComplete);
-  const prevId        = useRef(sessionId);
+  const prevId    = useRef(sessionId);
 
   useEffect(() => { onCompleteRef.current = onOpenComplete; }, [onOpenComplete]);
 
-  // Door swap — full reset
+  // Door swap — reset everything, close any open state
   useEffect(() => {
     if (prevId.current === sessionId) return;
     prevId.current = sessionId;
     setLoaded(false);
+    setIsOpen(false);
     autoRot.current   = true;
-    isOpen.current    = false;
     dragOrbit.current = { x: 0, y: 0 };
     autoAngle.current = 0;
-    if (pivotRef.current) { pivotRef.current.rotation.set(0, 0, 0); }
-    if (outerRef.current) { outerRef.current.rotation.set(0, 0, 0); }
+    if (outerRef.current) outerRef.current.rotation.set(0, 0, 0);
+    if (doorLightRef.current) doorLightRef.current.intensity = 0;
   }, [sessionId]);
 
-  // ── THE CINEMATIC OPEN SEQUENCE ──────────────────────────────────────────────
+  // OPEN — triggered by button click
   useEffect(() => {
-    if (openTrigger === 0 || isOpen.current || !pivotRef.current) return;
-    isOpen.current  = true;
-    autoRot.current = false;
-
-    // Kill drag offset — snap door face-forward before sequence starts
+    if (openTrigger === 0 || isOpen) return;
+    autoRot.current   = false;
     dragOrbit.current = { x: 0, y: 0 };
     autoAngle.current = 0;
+    if (outerRef.current) outerRef.current.rotation.set(0, 0, 0);
 
-    const pivot      = pivotRef.current;
-    const outer      = outerRef.current;
-    const doorLight  = doorLightRef.current;
-    const glowDisc   = glowDiscRef.current;
-    const accent     = style.accent;
+    // Light blast
+    const doorLight = doorLightRef.current;
+    const glowDisc  = glowDiscRef.current;
+    if (doorLight) gsap.to(doorLight, { intensity: 55, duration: 0.4, ease: "power2.in",
+      onComplete: () => gsap.to(doorLight, { intensity: 10, duration: 0.5, ease: "power2.out" }) });
+    if (glowDisc)  gsap.to((glowDisc.material as THREE.MeshBasicMaterial),
+      { opacity: 0.5, duration: 0.3, ease: "power2.in",
+        onComplete: () => gsap.to((glowDisc.material as THREE.MeshBasicMaterial), { opacity: 0.22, duration: 0.5 }) });
 
-    // Snap outer rotation to 0 immediately (face-forward)
-    if (outer) outer.rotation.set(0, 0, 0);
+    setIsOpen(true);
+    // Modal is fired by DoorMesh.onOpenDone once the clip reaches open position
+  }, [openTrigger, isOpen]);
 
-    const tl = gsap.timeline();
+  // CLOSE — triggered when modal dismissed
+  useEffect(() => {
+    if (closeSignal === 0 || !isOpen) return;
+    const doorLight = doorLightRef.current;
+    const glowDisc  = glowDiscRef.current;
+    if (doorLight) gsap.to(doorLight, { intensity: 0, duration: 0.5, ease: "power2.in" });
+    if (glowDisc)  gsap.to((glowDisc.material as THREE.MeshBasicMaterial),
+      { opacity: 0.14, duration: 0.5, ease: "power2.out" });
+    setIsOpen(false);
+    setTimeout(() => { autoRot.current = true; }, 1500);
+  }, [closeSignal, isOpen]);
 
-    // 1. Micro-shudder — door rattles like something is pushing from behind
-    tl.to(pivot.rotation, { z:  0.04, duration: 0.06, ease: "power1.inOut" })
-      .to(pivot.rotation, { z: -0.04, duration: 0.06, ease: "power1.inOut" })
-      .to(pivot.rotation, { z:  0.025, duration: 0.05, ease: "power1.inOut" })
-      .to(pivot.rotation, { z:  0,    duration: 0.05, ease: "power1.out" });
-
-    // 2. Brief pause — anticipation
-    tl.to({}, { duration: 0.08 });
-
-    // 3. Door swings open — dramatic arc on the left-edge hinge
-    //    Y rotation goes deeply negative (opens toward viewer-left)
-    //    Ease: fast start (power4.out) then settles with a subtle bounce
-    tl.to(pivot.rotation, {
-      y: -Math.PI * 0.78,
-      duration: 0.72,
-      ease: "back.out(0.3)",
-    });
-
-    // 4. Light behind door intensifies as it opens (runs parallel to swing)
-    if (doorLight) {
-      tl.to(doorLight, { intensity: 60, duration: 0.5, ease: "power2.in" }, "-=0.7");
-      tl.to(doorLight, { intensity: 8,  duration: 0.3, ease: "power2.out" }, "+=0.0");
-    }
-
-    // 5. Floor glow pulses
-    if (glowDisc) {
-      tl.to((glowDisc.material as THREE.MeshBasicMaterial), { opacity: 0.55, duration: 0.3, ease: "power2.in" }, "-=0.9");
-      tl.to((glowDisc.material as THREE.MeshBasicMaterial), { opacity: 0.14, duration: 0.5, ease: "power2.out" }, "-=0.2");
-    }
-
-    // 6. Fire modal at peak of swing (door is fully open)
-    tl.call(() => { onCompleteRef.current(); });
-
-    // 7. Door swings back — slower, weighted, with a small bounce at the end
-    tl.to(pivot.rotation, {
-      y: 0,
-      duration: 1.1,
-      ease: "elastic.out(0.6, 0.5)",
-      delay: 0.55,
-      onComplete: () => {
-        isOpen.current  = false;
-        autoRot.current = true;
-      },
-    });
-  }, [openTrigger, style.accent]);
-
-  // RAF loop — float + orbit
+  // Float + orbit loop
   useFrame(({ clock }, delta) => {
     if (!outerRef.current || !floatRef.current) return;
-    floatRef.current.position.y = Math.sin(clock.getElapsedTime() * 0.75) * 0.055;
+    if (!isOpen) floatRef.current.position.y = Math.sin(clock.getElapsedTime() * 0.75) * 0.055;
     if (autoRot.current) autoAngle.current += delta * 0.15;
     const tx = dragOrbit.current.x;
     const ty = autoAngle.current + dragOrbit.current.y;
@@ -367,49 +376,36 @@ function DoorScene({
     outerRef.current.rotation.y += (ty - outerRef.current.rotation.y) * 0.1;
   });
 
-  const onReady = useCallback(() => { setLoaded(true); }, []);
-
-  const accentCol = new THREE.Color(style.accent);
+  const onReady    = useCallback(() => { setLoaded(true); }, []);
+  const onOpenDone = useCallback(() => { onCompleteRef.current(); }, []);
+  const accentCol  = new THREE.Color(style.accent);
 
   return (
     <>
       <LightRig sessionId={sessionId} />
 
-      {/* Hidden light behind door — blazes open during swing */}
-      <group ref={hingeWrap as React.RefObject<THREE.Group>}>
-        <pointLight
-          ref={doorLightRef}
-          position={[0, 0.5, -1]}
-          intensity={0}
-          distance={8}
-          color={style.accent}
-        />
-      </group>
+      {/* Light behind door — blazes as it opens */}
+      <pointLight ref={doorLightRef} position={[0, 0.5, -1.5]}
+        intensity={0} distance={8} color={style.accent} />
 
-      {/* Floor glow disc */}
+      {/* Floor glow */}
       <mesh ref={glowDiscRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.45, 0]}>
         <circleGeometry args={[1.8, 48]} />
         <meshBasicMaterial color={accentCol} transparent opacity={0.14} />
       </mesh>
 
-      {/* Orbit → float → hinge offset → hinge pivot → mesh */}
+      {/* Orbit + float wrapper */}
       <group ref={outerRef}>
         <group ref={floatRef}>
-          {/*
-            Hinge math:
-            - hingeWrap translates the whole group +X so the pivot is at the
-              door's left edge (approx half the normalised width = 0.65 units)
-            - pivotRef rotates around Y at that left-edge origin
-            - mesh sits at -0.65 inside pivotRef so it stays at world 0
-          */}
-          <group position={[0.65, 0, 0]}>
-            <group ref={pivotRef} position={[-0.65, 0, 0]}>
-              {!loaded && <Placeholder color={style.accent} />}
-              <Suspense fallback={null}>
-                <DoorMesh sessionId={sessionId} onReady={onReady} />
-              </Suspense>
-            </group>
-          </group>
+          {!loaded && <Placeholder color={style.accent} />}
+          <Suspense fallback={null}>
+            <DoorMesh
+              sessionId={sessionId}
+              open={isOpen}
+              onReady={onReady}
+              onOpenDone={onOpenDone}
+            />
+          </Suspense>
         </group>
       </group>
 
@@ -574,9 +570,10 @@ function MobileSessions({ onSelect }: { onSelect: (s: SessionTier) => void }) {
 
 // ─── Desktop split layout ─────────────────────────────────────────────────────
 function DesktopSessions({ onBook }: { onBook: (s: SessionTier) => void }) {
-  const [activeId,    setActiveId]   = useState("solo");
-  const [openTrigger, setOpenTrigger] = useState(0);
-  const [modal,       setModal]      = useState<SessionTier | null>(null);
+  const [activeId,     setActiveId]    = useState("solo");
+  const [openTrigger,  setOpenTrigger] = useState(0);
+  const [closeSignal,  setCloseSignal] = useState(0);
+  const [modal,        setModal]       = useState<SessionTier | null>(null);
   const canvasWrap  = useRef<HTMLDivElement>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bgRef       = useRef<HTMLDivElement>(null);
@@ -585,14 +582,15 @@ function DesktopSessions({ onBook }: { onBook: (s: SessionTier) => void }) {
   const activeSession = SESSIONS.find(s => s.id === activeId)!;
   const activeStyle   = SESSION_STYLE[activeId];
 
-  // Stagger preload remaining GLBs
+  // Preload solo immediately, stagger rest — rigged files
   useEffect(() => {
+    useGLTF.preload(SESSION_STYLE["solo"].model);
     const ids = Object.keys(SESSION_STYLE).filter(id => id !== "solo");
     let i = 0;
     const next = () => {
-      if (i < ids.length) { useGLTF.preload(SESSION_STYLE[ids[i]].model); i++; setTimeout(next, 700); }
+      if (i < ids.length) { useGLTF.preload(SESSION_STYLE[ids[i]].model); i++; setTimeout(next, 800); }
     };
-    const t = setTimeout(next, 1500);
+    const t = setTimeout(next, 1200);
     return () => clearTimeout(t);
   }, []);
 
@@ -745,6 +743,7 @@ function DesktopSessions({ onBook }: { onBook: (s: SessionTier) => void }) {
                 <DoorScene
                   sessionId={activeId}
                   openTrigger={openTrigger}
+                  closeSignal={closeSignal}
                   onOpenComplete={handleOpenComplete}
                 />
               </Suspense>
@@ -806,12 +805,12 @@ function DesktopSessions({ onBook }: { onBook: (s: SessionTier) => void }) {
         </div>
       </div>
 
-      {/* Modal — mounts here, inside DesktopSessions, so state is in scope */}
+      {/* Modal — door stays open behind it; closing fires closeSignal to swing door shut */}
       {modal && (
         <SessionModal
           session={modal}
-          onClose={() => setModal(null)}
-          onBook={s => { onBook(s); setModal(null); }}
+          onClose={() => { setModal(null); setCloseSignal(c => c + 1); }}
+          onBook={s => { onBook(s); setModal(null); setCloseSignal(c => c + 1); }}
         />
       )}
     </>
@@ -821,7 +820,7 @@ function DesktopSessions({ onBook }: { onBook: (s: SessionTier) => void }) {
 // ─── Root export ──────────────────────────────────────────────────────────────
 export default function SessionsSection() {
   const isMobile = useIsMobile();
-  const { setBookingOpen, addToCart } = useStore();
+  const { setBookingOpen, setBookingSession, setBookingStep } = useStore();
   const [mobileSelected, setMobileSelected] = useState<SessionTier | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -832,9 +831,10 @@ export default function SessionsSection() {
       document.getElementById("builder")?.scrollIntoView({ behavior: "smooth" });
       return;
     }
-    addToCart({ id: `session-${session.id}`, type: "session", name: session.name, price: session.price, quantity: 1 });
+    setBookingSession(session);
+    setBookingStep(2);
     setBookingOpen(true);
-  }, [addToCart, setBookingOpen]);
+  }, [setBookingSession, setBookingStep, setBookingOpen]);
 
   return (
     <section id="sessions" style={{ background: "var(--void)", position: "relative", overflow: "hidden" }}>

@@ -82,7 +82,7 @@ function HeroScene({ mouseX, mouseY, isMobile }: { mouseX: number; mouseY: numbe
 }
 
 export default function Home() {
-  const { setBookingOpen } = useStore();
+  const { setBookingOpen, resetBooking } = useStore();
   const [preloaderDone, setPreloaderDone] = useState(false);
   const [mouse, setMouse]   = useState({ x: 0, y: 0 });
   const [scrolled, setScrolled] = useState(false);
@@ -265,7 +265,7 @@ export default function Home() {
             <button
               className="btn-teal"
               style={{ fontSize: 13, letterSpacing: "0.08em" }}
-              onClick={() => setBookingOpen(true)}
+              onClick={() => { resetBooking(); setBookingOpen(true); }}
             >
               Book a Session ↗
             </button>

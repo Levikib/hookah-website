@@ -515,17 +515,22 @@ function ProgressBar({ current, steps, onGoto }: { current: number; steps: typeo
 
 // ─── Main wizard ──────────────────────────────────────────────────────────────
 export default function PackageWizard() {
-  const [stepIdx, setStepIdx]       = useState(0);
-  const [occasion, setOccasion]     = useState("");
-  const [model, setModel]           = useState<RentalModel | null>(null);
+  const { addToCart, setBookingOpen, booking, setBookingSession, setBookingStep, setBookingHookah, setBookingFlavours } = useStore();
+
+  // Seed wizard from booking engine state on first render
+  const [stepIdx, setStepIdx]       = useState(() => {
+    if (booking.selectedHookah) return 2; // hookah pre-selected → jump to flavours
+    if (booking.session) return 1;        // session pre-selected → jump to hookah
+    return 0;
+  });
+  const [occasion, setOccasion]     = useState(() => booking.session?.id ?? "");
+  const [model, setModel]           = useState<RentalModel | null>(() => booking.selectedHookah ?? null);
   const [durationH, setDurationH]   = useState(2);
-  const [flavourIds, setFlavourIds] = useState<number[]>([]);
+  const [flavourIds, setFlavourIds] = useState<number[]>(() => booking.selectedFlavours.map(f => f.id));
   const [addonIds, setAddonIds]     = useState<string[]>([]);
   const [booked, setBooked]         = useState(false);
 
   const contentRef = useRef<HTMLDivElement>(null);
-  const addToCart  = useStore(s => s.addToCart);
-  const setBookingOpen = useStore(s => s.setBookingOpen);
 
   const step = STEPS[stepIdx];
 
@@ -557,6 +562,19 @@ export default function PackageWizard() {
   }, [stepIdx, gotoStep]);
 
   const handleBook = useCallback(() => {
+    // Wire booking engine — BookingModal will open with this context pre-loaded
+    const matchedSession = SESSIONS.find(s => s.id === occasion) ?? null;
+    if (matchedSession) {
+      setBookingSession(matchedSession);
+      setBookingStep(2); // skip session picker, go straight to date/time
+    } else {
+      // Occasion doesn't map to a session tier (e.g. "birthday") — open at step 1
+      setBookingStep(1);
+    }
+    if (model) setBookingHookah(model);
+    const selectedFlavourObjects = FLAVOURS.filter(f => flavourIds.includes(f.id));
+    if (selectedFlavourObjects.length > 0) setBookingFlavours(selectedFlavourObjects);
+
     // Add hookah to cart
     if (model) {
       const dur = DURATIONS.find(d => d.hours === durationH) ?? DURATIONS[0];
@@ -573,7 +591,7 @@ export default function PackageWizard() {
     });
     setBooked(true);
     setTimeout(() => setBookingOpen(true), 400);
-  }, [model, durationH, flavourIds, addonIds, addToCart, setBookingOpen]);
+  }, [occasion, model, durationH, flavourIds, addonIds, addToCart, setBookingOpen, setBookingSession, setBookingStep, setBookingHookah, setBookingFlavours]);
 
   // Compute running total for sidebar
   const dur         = DURATIONS.find(d => d.hours === durationH) ?? DURATIONS[0];

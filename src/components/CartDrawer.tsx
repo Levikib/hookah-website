@@ -1,5 +1,7 @@
 "use client";
 import { useStore } from "@/store/useStore";
+import { SESSIONS } from "@/data/sessions";
+import { FLAVOURS } from "@/data/flavours";
 
 function kes(amount: number) {
   return `KES ${amount.toLocaleString("en-KE")}`;
@@ -13,7 +15,7 @@ export default function CartDrawer() {
   const removeFromCart = useStore((s) => s.removeFromCart);
   const updateQuantity = useStore((s) => s.updateQuantity);
   const clearCart = useStore((s) => s.clearCart);
-  const setBookingOpen = useStore((s) => s.setBookingOpen);
+  const { setBookingOpen, setBookingSession, setBookingStep, setBookingFlavours } = useStore();
 
   if (!cartOpen) return null;
 
@@ -299,6 +301,25 @@ export default function CartDrawer() {
 
             <button
               onClick={() => {
+                // Reconstruct booking state from cart items before opening modal
+                const sessionItem = cart.find(c => c.type === "session");
+                const matched = sessionItem
+                  ? SESSIONS.find(s => sessionItem.id.includes(s.id)) ?? null
+                  : null;
+                if (matched) {
+                  setBookingSession(matched);
+                  setBookingStep(2); // skip session picker — already have one
+                } else {
+                  setBookingStep(1); // no session in cart → must pick one first
+                }
+                const flavourItems = cart.filter(c => c.type === "flavour");
+                if (flavourItems.length > 0) {
+                  const flavours = flavourItems.map(item => {
+                    const id = parseInt(item.id.replace(/.*-/, ""));
+                    return FLAVOURS.find(f => f.id === id);
+                  }).filter(Boolean) as typeof FLAVOURS;
+                  if (flavours.length > 0) setBookingFlavours(flavours);
+                }
                 setCartOpen(false);
                 setBookingOpen(true);
               }}

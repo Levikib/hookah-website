@@ -15,6 +15,7 @@ export interface CartItem {
 export interface BookingState {
   step: 1 | 2 | 3 | 4;
   session: SessionTier | null;
+  selectedHookah: RentalModel | null;
   date: string | null;
   timeSlot: string | null;
   location: "venue" | "delivery";
@@ -40,11 +41,13 @@ interface Store {
   booking: BookingState;
   setBookingStep: (step: 1 | 2 | 3 | 4) => void;
   setBookingSession: (session: SessionTier | null) => void;
+  setBookingHookah: (hookah: RentalModel | null) => void;
   setBookingDate: (date: string | null) => void;
   setBookingTime: (slot: string | null) => void;
   setBookingLocation: (loc: "venue" | "delivery") => void;
   setDeliveryAddress: (addr: string) => void;
   toggleFlavour: (f: Flavour, maxFlavours: number) => void;
+  setBookingFlavours: (flavours: Flavour[]) => void;
   setPromoCode: (code: string) => void;
   resetBooking: () => void;
 
@@ -58,6 +61,7 @@ interface Store {
 const defaultBooking: BookingState = {
   step: 1,
   session: null,
+  selectedHookah: null,
   date: null,
   timeSlot: null,
   location: "venue",
@@ -93,6 +97,7 @@ export const useStore = create<Store>((set, get) => ({
   booking: defaultBooking,
   setBookingStep: (step) => set((s) => ({ booking: { ...s.booking, step } })),
   setBookingSession: (session) => set((s) => ({ booking: { ...s.booking, session } })),
+  setBookingHookah: (selectedHookah) => set((s) => ({ booking: { ...s.booking, selectedHookah } })),
   setBookingDate: (date) => set((s) => ({ booking: { ...s.booking, date, timeSlot: null } })),
   setBookingTime: (timeSlot) => set((s) => ({ booking: { ...s.booking, timeSlot } })),
   setBookingLocation: (location) => set((s) => ({ booking: { ...s.booking, location } })),
@@ -106,6 +111,7 @@ export const useStore = create<Store>((set, get) => ({
       set((s) => ({ booking: { ...s.booking, selectedFlavours: [...s.booking.selectedFlavours, f] } }));
     }
   },
+  setBookingFlavours: (selectedFlavours) => set((s) => ({ booking: { ...s.booking, selectedFlavours } })),
   setPromoCode: (promoCode) => set((s) => ({ booking: { ...s.booking, promoCode } })),
   resetBooking: () => set({ booking: defaultBooking }),
 

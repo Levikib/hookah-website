@@ -691,6 +691,18 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
       setError("Please enter a valid email address.");
       return;
     }
+    if (!session) {
+      setError("No session selected. Please go back and choose a session.");
+      return;
+    }
+    if (!date) {
+      setError("No date selected. Please go back and pick a date.");
+      return;
+    }
+    if (!timeSlot) {
+      setError("No time slot selected. Please go back and pick a time.");
+      return;
+    }
     setError("");
     setLoading(true);
     try {
@@ -703,10 +715,10 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
           bookingData: {
             name: customerName.trim(),
             phone: customerPhone.trim() || undefined,
-            sessionId: session?.id ?? "unknown",
-            sessionName: session?.name ?? "Session",
-            bookingDate: date ?? "",
-            timeSlot: timeSlot ?? "",
+            sessionId: session.id,
+            sessionName: session.name,
+            bookingDate: date,
+            timeSlot: timeSlot,
             flavours: selectedFlavours.map(f => ({ flavourId: f.id, quantity: 1 })),
             notes: `Location: ${location}${location === "delivery" ? ` — ${deliveryAddress}` : ""}`,
           },
@@ -1084,7 +1096,8 @@ export default function BookingModal() {
   const [refNum, setRefNum] = useState("");
   const isMobile = useIsMobile();
 
-  const step = booking.step;
+  // Safety: if session not set but step > 1, clamp to step 1
+  const step = (!booking.session && booking.step > 1) ? 1 : booking.step;
 
   if (!bookingOpen) return null;
 
@@ -1104,7 +1117,8 @@ export default function BookingModal() {
   const canGoNext = (() => {
     if (step === 1) return !!booking.session;
     if (step === 2) return !!booking.date && !!booking.timeSlot;
-    if (step === 3) return true; // optional — can skip
+    // Step 3→4: require session + date + time to be set (flavours are optional)
+    if (step === 3) return !!booking.session && !!booking.date && !!booking.timeSlot;
     return false;
   })();
 
@@ -1288,6 +1302,17 @@ export default function BookingModal() {
                     Next →
                   </button>
                 </div>
+              )}
+              {/* Hint when step 3 is blocked due to missing session/date */}
+              {step === 3 && !canGoNext && (
+                <p style={{
+                  fontFamily: "var(--font-mono)", fontSize: 10,
+                  letterSpacing: "0.12em", textTransform: "uppercase",
+                  color: "rgba(255,180,100,0.7)", textAlign: "center",
+                  marginTop: 8,
+                }}>
+                  {!booking.session ? "← Go back and choose a session first" : "← Go back and pick a date & time"}
+                </p>
               )}
             </>
           )}

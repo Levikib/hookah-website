@@ -712,7 +712,7 @@ function MobileWall({ category, onSelect }: { category: string; onSelect: (f: Fl
 // ─── Main FlavourWall ─────────────────────────────────────────────────────────
 export default function FlavourWall() {
   const isMobile = useIsMobile();
-  const addToCart = useStore((s) => s.addToCart);
+  const { addToCart, toggleFlavour, setBookingStep, setBookingOpen } = useStore();
 
   const [category, setCategory]        = useState("All");
   const [selectedFlavour, setSelected] = useState<Flavour | null>(null);
@@ -720,8 +720,14 @@ export default function FlavourWall() {
   const categories = useMemo(() => ["All", ...Array.from(new Set(FLAVOURS.map(f => f.category)))], []);
 
   const handleAdd = useCallback((f: Flavour) => {
+    // Add to cart for shop purchases
     addToCart({ id: `flavour-${f.id}`, type: "flavour", name: f.name, price: f.price, quantity: 1 });
-  }, [addToCart]);
+    // Also pre-select into booking engine (up to 4 flavours)
+    toggleFlavour(f, 4);
+    // Open BookingModal at step 3 (flavour selection already done, user can continue booking)
+    setBookingStep(3);
+    setBookingOpen(true);
+  }, [addToCart, toggleFlavour, setBookingStep, setBookingOpen]);
 
   return (
     <section
