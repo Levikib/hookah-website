@@ -4,8 +4,8 @@ import { createServiceClient } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
-type BookingStatus = "pending" | "confirmed" | "cancelled" | "completed";
-const VALID_STATUSES: BookingStatus[] = ["pending", "confirmed", "cancelled", "completed"];
+type BookingStatus = "new" | "contacted" | "confirmed" | "cancelled" | "completed";
+const VALID_STATUSES: BookingStatus[] = ["new", "contacted", "confirmed", "cancelled", "completed"];
 
 export async function POST(
   req: NextRequest,

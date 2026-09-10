@@ -25,6 +25,14 @@
   --electric: #edff66;   /* CTA yellow from Zentry */
   --smoke:    rgba(232,121,249,0.35); /* muted magenta smoke */
 
+  /* ── Smokers Vine brand (red/black nightlife) ── */
+  --sv-red:        #e11d2e;   /* primary brand red */
+  --sv-red-bright: #ff3b4e;
+  --sv-red-deep:   #7f1d1d;
+  --sv-black:      #0a0508;   /* near-black background */
+  --sv-charcoal:   #140b0d;   /* card/panel background */
+  --sv-gold:       #f59e0b;   /* price/accent, shared with --gold */
+
   /* ── Text ── */
   --text-primary: #f0f2fa;   /* from game-website blue-100 */
   --text-muted:   #a89bc4;   /* purple-tinted grey */

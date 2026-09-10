@@ -47,10 +47,10 @@ export interface Database {
           id: string;
           created_at: string;
           customer_id: string;
-          status: "pending" | "paid" | "processing" | "shipped" | "delivered" | "cancelled";
+          status: "new" | "contacted" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
           total_kobo: number;
           delivery_address: string;
-          paystack_reference: string | null;
+          lead_id: string | null;
         };
         Insert: Omit<Database["public"]["Tables"]["orders"]["Row"], "id" | "created_at"> &
           Partial<Pick<Database["public"]["Tables"]["orders"]["Row"], "id" | "created_at">>;
@@ -75,13 +75,13 @@ export interface Database {
           id: string;
           created_at: string;
           customer_id: string;
-          session_id: string;
-          session_name: string;
+          service_id: string;
+          service_name: string;
           booking_date: string;
           time_slot: string;
-          status: "pending" | "confirmed" | "cancelled" | "completed";
+          status: "new" | "contacted" | "confirmed" | "cancelled" | "completed";
           total_kobo: number;
-          paystack_reference: string | null;
+          lead_id: string | null;
           notes: string | null;
         };
         Insert: Omit<Database["public"]["Tables"]["bookings"]["Row"], "id" | "created_at"> &
@@ -113,6 +113,22 @@ export interface Database {
         Insert: Omit<Database["public"]["Tables"]["inventory"]["Row"], "id" | "created_at"> &
           Partial<Pick<Database["public"]["Tables"]["inventory"]["Row"], "id" | "created_at">>;
         Update: Partial<Database["public"]["Tables"]["inventory"]["Insert"]>;
+      };
+      leads: {
+        Row: {
+          id: string;
+          created_at: string;
+          name: string;
+          phone: string;
+          email: string | null;
+          type: "booking" | "order" | "enquiry";
+          payload: Record<string, unknown>;
+          status: "new" | "contacted" | "confirmed" | "completed" | "cancelled";
+          whatsapp_sent_at: string | null;
+        };
+        Insert: Omit<Database["public"]["Tables"]["leads"]["Row"], "id" | "created_at"> &
+          Partial<Pick<Database["public"]["Tables"]["leads"]["Row"], "id" | "created_at">>;
+        Update: Partial<Database["public"]["Tables"]["leads"]["Insert"]>;
       };
       delivery_events: {
         Row: {

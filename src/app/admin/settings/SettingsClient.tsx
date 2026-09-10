@@ -1,12 +1,12 @@
 "use client";
 import { useState } from "react";
-import type { SessionTier } from "@/data/sessions";
+import type { ServiceTier } from "@/data/services";
 import type { RentalModel } from "@/data/rentals";
 import type { Flavour } from "@/data/flavours";
 
 function kes(n: number) { return `KES ${n.toLocaleString("en-KE")}`; }
 
-type Tab = "sessions" | "pricing" | "rentals" | "flavours" | "business";
+type Tab = "sessions" | "rentals" | "flavours" | "business";
 
 function TabBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
@@ -59,16 +59,14 @@ function SaveBtn({ onClick, saving, saved }: { onClick: () => void; saving: bool
 }
 
 export default function SettingsClient({
-  sessions, customPricing, rentals, flavours,
+  sessions, rentals, flavours,
 }: {
-  sessions: SessionTier[];
-  customPricing: Record<string, number>;
+  sessions: ServiceTier[];
   rentals: RentalModel[];
   flavours: Flavour[];
 }) {
   const [tab, setTab] = useState<Tab>("sessions");
   const [editSessions, setEditSessions] = useState(sessions.map(s => ({ ...s })));
-  const [editPricing, setEditPricing] = useState({ ...customPricing });
   const [editRentals, setEditRentals] = useState(rentals.map(r => ({ ...r })));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -102,7 +100,7 @@ export default function SettingsClient({
     <div>
       {/* Tab bar */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 28 }}>
-        {(["sessions", "pricing", "rentals", "flavours", "business"] as Tab[]).map(t => (
+        {(["sessions", "rentals", "flavours", "business"] as Tab[]).map(t => (
           <TabBtn key={t} label={t} active={tab === t} onClick={() => setTab(t)} />
         ))}
       </div>
@@ -128,24 +126,18 @@ export default function SettingsClient({
                     <Field label="Name">
                       <Input value={editSessions[i].name} onChange={v => setEditSessions(prev => prev.map((s, j) => j === i ? { ...s, name: v } : s))} />
                     </Field>
-                    <Field label="Price (KES)">
-                      <Input type="number" value={editSessions[i].price} onChange={v => setEditSessions(prev => prev.map((s, j) => j === i ? { ...s, price: parseInt(v) || 0 } : s))} />
-                    </Field>
-                    <Field label="Duration">
-                      <Input value={editSessions[i].duration} onChange={v => setEditSessions(prev => prev.map((s, j) => j === i ? { ...s, duration: v } : s))} />
-                    </Field>
-                    <Field label="People">
-                      <Input value={String(editSessions[i].people)} onChange={v => setEditSessions(prev => prev.map((s, j) => j === i ? { ...s, people: parseInt(v) || v } : s))} />
+                    <Field label="Starting Price (KES)">
+                      <Input type="number" value={editSessions[i].startingPrice} onChange={v => setEditSessions(prev => prev.map((s, j) => j === i ? { ...s, startingPrice: parseInt(v) || 0 } : s))} />
                     </Field>
                     <Field label="Tagline">
                       <Input value={editSessions[i].tagline} onChange={v => setEditSessions(prev => prev.map((s, j) => j === i ? { ...s, tagline: v } : s))} />
                     </Field>
-                    <Field label="Mood">
-                      <Input value={editSessions[i].mood} onChange={v => setEditSessions(prev => prev.map((s, j) => j === i ? { ...s, mood: v } : s))} />
+                    <Field label="Vibe">
+                      <Input value={editSessions[i].vibe} onChange={v => setEditSessions(prev => prev.map((s, j) => j === i ? { ...s, vibe: v } : s))} />
                     </Field>
                   </div>
                   <div style={{ marginTop: 16, padding: "10px 14px", background: "rgba(237,255,102,0.06)", border: "1px solid rgba(237,255,102,0.15)", borderRadius: 8, fontSize: 14, color: "var(--electric)", fontWeight: 700 }}>
-                    Current Price: {kes(editSessions[i].price)}
+                    Starting Price: {editSessions[i].priceEstimated ? "Est. " : ""}{kes(editSessions[i].startingPrice)}
                   </div>
                 </div>
               </div>
@@ -153,27 +145,6 @@ export default function SettingsClient({
           </div>
           <div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end" }}>
             <SaveBtn onClick={handleSave} saving={saving} saved={saved} />
-          </div>
-        </div>
-      )}
-
-      {/* PRICING TAB */}
-      {tab === "pricing" && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-            <p style={{ color: "var(--text-muted)", fontSize: 14 }}>Custom package wizard pricing components.</p>
-            <SaveBtn onClick={handleSave} saving={saving} saved={saved} />
-          </div>
-          <div style={{ background: "var(--nebula)", border: "1px solid var(--glass-border)", borderRadius: 14, padding: 24 }}>
-            <h2 style={{ fontFamily: "var(--font-bebas), sans-serif", fontSize: 20, color: "var(--electric)", letterSpacing: "0.06em", marginBottom: 20 }}>CUSTOM BUILD PRICING</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px,100%), 1fr))", gap: 20 }}>
-              {Object.entries(editPricing).map(([key, val]) => (
-                <Field key={key} label={key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}>
-                  <Input type="number" value={val} onChange={v => setEditPricing(p => ({ ...p, [key]: parseInt(v) || 0 }))} />
-                  <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 4 }}>{kes(editPricing[key])}</div>
-                </Field>
-              ))}
-            </div>
           </div>
         </div>
       )}

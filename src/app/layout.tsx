@@ -11,9 +11,9 @@ const mono = Space_Mono({ weight: ["400","700"], subsets: ["latin"], variable: "
 const cormorant = Cormorant_Garamond({ weight: ["300","400","500","600","700"], style: ["normal","italic"], subsets: ["latin"], variable: "--font-cormorant", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Hookah Sessions — Rent · Book · Flavours",
-  description: "Premium hookah rental, session booking, and shisha flavours. The session starts here.",
-  keywords: "hookah, shisha, rental, booking, flavours, sessions",
+  title: "Smokers Vine — Hookah Service, Flavours & Rentals",
+  description: "Professional hookah service for parties, weddings, and events. Premium shisha flavours and hookah pots for sale or rental. Feel the vibe.",
+  keywords: "hookah, shisha, smokers vine, nairobi, event hookah, shisha flavours, hookah rental",
 };
 
 export const viewport: Viewport = {

@@ -5,12 +5,12 @@ import { useStore } from "@/store/useStore";
 import { useIsMobile } from "@/context/MobileContext";
 
 const NAV_LINKS = [
-  { label: "Sessions",  href: "#sessions"  },
+  { label: "Services",  href: "#services"  },
   { label: "Flavours",  href: "#flavours"  },
   { label: "Rentals",   href: "#rentals"   },
 ];
 
-const SECTIONS = ["home", "sessions", "flavours", "rentals", "shop"];
+const SECTIONS = ["home", "services", "flavours", "rentals"];
 
 export default function Navigation() {
   const [visible, setVisible]         = useState(false);
@@ -167,25 +167,17 @@ export default function Navigation() {
           style={{
             fontFamily: "var(--font-bebas)",
             fontSize: 22,
-            letterSpacing: "0.1em",
+            letterSpacing: "0.06em",
             color: "#fff",
             background: "none",
             border: "none",
             cursor: "none",
             padding: 0,
             textTransform: "uppercase",
+            whiteSpace: "nowrap",
           }}
         >
-          <span style={{ color: "var(--teal)" }}>HKH</span>
-          <span
-            style={{
-              color: "rgba(255,255,255,0.5)",
-              fontSize: 14,
-              marginLeft: 4,
-            }}
-          >
-            ™
-          </span>
+          Smokers <span style={{ color: "var(--sv-red-bright)" }}>Vine</span>
         </button>
 
         {/* Center links — desktop only */}
@@ -213,7 +205,7 @@ export default function Navigation() {
                     letterSpacing: "0.1em",
                     textTransform: "uppercase",
                     color: isActive
-                      ? "var(--cyan-bright)"
+                      ? "var(--sv-red-bright)"
                       : "rgba(255,255,255,0.65)",
                     background: "none",
                     border: "none",
@@ -221,7 +213,7 @@ export default function Navigation() {
                     padding: "10px 8px",
                     transition: "color 0.25s, text-shadow 0.25s",
                     textShadow: isActive
-                      ? "0 0 16px rgba(34,211,238,0.6)"
+                      ? "0 0 16px rgba(225,29,46,0.6)"
                       : "none",
                     position: "relative",
                   }}
@@ -241,8 +233,8 @@ export default function Navigation() {
                 width: 8,
                 height: 2,
                 borderRadius: 2,
-                background: "var(--gold, #f59e0b)",
-                boxShadow: "0 0 8px var(--gold, #f59e0b)",
+                background: "var(--sv-red-bright)",
+                boxShadow: "0 0 8px var(--sv-red-bright)",
                 opacity: 0,
                 pointerEvents: "none",
                 transition: "none", // GSAP handles it
@@ -293,7 +285,7 @@ export default function Navigation() {
                   width: 18,
                   height: 18,
                   borderRadius: "50%",
-                  background: "var(--teal)",
+                  background: "var(--sv-red)",
                   color: "#000",
                   fontFamily: "var(--font-mono)",
                   fontSize: 10,
@@ -464,7 +456,7 @@ export default function Navigation() {
                   width: 18,
                   height: 18,
                   borderRadius: "50%",
-                  background: "var(--teal)",
+                  background: "var(--sv-red)",
                   color: "#000",
                   fontSize: 10,
                   fontWeight: 700,

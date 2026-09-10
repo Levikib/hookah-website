@@ -1,5 +1,4 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
 import { useIsMobile } from "@/context/MobileContext";
 
 // ── Inline SVG social icons ────────────────────────────────────────
@@ -32,83 +31,44 @@ function IconWhatsApp() {
 const SOCIAL_LINKS = [
   { label: "Instagram", href: "#", icon: <IconInstagram /> },
   { label: "TikTok",    href: "#", icon: <IconTikTok />    },
-  { label: "WhatsApp",  href: "#", icon: <IconWhatsApp />  },
+  { label: "WhatsApp",  href: "https://wa.me/254746621663", icon: <IconWhatsApp />  },
 ];
 
 const QUICK_LINKS = [
-  { label: "Sessions",  href: "#sessions"  },
+  { label: "Services",  href: "#services"  },
   { label: "Flavours",  href: "#flavours"  },
   { label: "Rentals",   href: "#rentals"   },
-  { label: "Shop",      href: "#shop"      },
-  { label: "Book Now",  href: "#book"      },
 ];
 
-// ── Newsletter component ───────────────────────────────────────────
-function NewsletterForm() {
-  const [email, setEmail]     = useState("");
-  const [success, setSuccess] = useState(false);
-  const [flash, setFlash]     = useState(false);
-
-  const handleJoin = () => {
-    if (!email.trim()) return;
-    setSuccess(true);
-    setFlash(true);
-    // Reset flash after animation
-    setTimeout(() => setFlash(false), 800);
-  };
-
+// ── Policy notice ───────────────────────────────────────────────────
+function PolicyNotice() {
+  const policies = [
+    "Delivery via boda boda only",
+    "Full payment before dispatch",
+    "Please avoid last-minute cancellations",
+  ];
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <p style={{
-        fontFamily: "var(--font-barlow)",
-        fontSize: 13,
-        color: "rgba(255,255,255,0.45)",
-        lineHeight: 1.5,
-        marginBottom: 4,
+        fontFamily: "var(--font-mono)",
+        fontSize: 10,
+        letterSpacing: "0.15em",
+        textTransform: "uppercase",
+        color: "rgba(255,255,255,0.3)",
+        marginBottom: 2,
       }}>
-        Join the circle. First to know about drops & events.
+        Good to know
       </p>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <input
-          type="email"
-          placeholder="your@email.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleJoin()}
-          style={{
-            flex: "1 1 160px",
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            borderRadius: 8,
-            padding: "12px 14px",
-            fontFamily: "var(--font-mono)",
-            fontSize: 12,
-            color: "#fff",
-            outline: "none",
-            minHeight: 44,
-          }}
-        />
-        <button
-          onClick={handleJoin}
-          style={{
-            background: flash ? "var(--gold, #f59e0b)" : "rgba(255,255,255,0.08)",
-            border: `1px solid ${flash ? "var(--gold, #f59e0b)" : "rgba(255,255,255,0.15)"}`,
-            borderRadius: 8,
-            padding: "10px 16px",
-            fontFamily: "var(--font-mono)",
-            fontSize: 11,
-            letterSpacing: "0.12em",
-            color: flash ? "#000" : (success ? "var(--gold, #f59e0b)" : "#fff"),
-            cursor: "none",
-            minHeight: 44,
-            minWidth: 64,
-            transition: "background 0.25s ease, color 0.25s ease, border-color 0.25s ease",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {success ? (flash ? "✓ YOU'RE IN" : "✓ YOU'RE IN") : "JOIN"}
-        </button>
-      </div>
+      {policies.map((p) => (
+        <p key={p} style={{
+          fontFamily: "var(--font-barlow)",
+          fontSize: 13,
+          color: "rgba(255,255,255,0.45)",
+          lineHeight: 1.5,
+        }}>
+          · {p}
+        </p>
+      ))}
     </div>
   );
 }
@@ -116,12 +76,6 @@ function NewsletterForm() {
 // ── Main Footer ────────────────────────────────────────────────────
 export default function Footer() {
   const isMobile = useIsMobile();
-  const shimmerRef = useRef<HTMLDivElement>(null);
-
-  // Trigger shimmer animation via CSS only (no GSAP needed here)
-  useEffect(() => {
-    // shimmer line is purely CSS
-  }, []);
 
   const scrollTo = (href: string) => {
     const el = document.querySelector(href);
@@ -148,19 +102,19 @@ export default function Footer() {
           background: linear-gradient(
             90deg,
             transparent 0%,
-            var(--gold, #f59e0b) 40%,
-            var(--cyan-bright, #22d3ee) 60%,
+            var(--sv-red, #e11d2e) 40%,
+            var(--sv-red-bright, #ff3b4e) 60%,
             transparent 100%
           );
           animation: shimmer-sweep 3s linear infinite;
         }
         .footer-social-btn:hover {
-          color: var(--cyan-bright, #22d3ee) !important;
-          border-color: rgba(34,211,238,0.35) !important;
-          background: rgba(34,211,238,0.06) !important;
+          color: var(--sv-red-bright, #ff3b4e) !important;
+          border-color: rgba(255,59,78,0.35) !important;
+          background: rgba(255,59,78,0.06) !important;
         }
         .footer-quick-link:hover {
-          color: var(--cyan-bright, #22d3ee) !important;
+          color: var(--sv-red-bright, #ff3b4e) !important;
         }
       `}</style>
 
@@ -193,7 +147,7 @@ export default function Footer() {
             letterSpacing: "0.05em",
           }}
         >
-          HKH
+          SV
         </div>
 
         {/* Main grid */}
@@ -229,8 +183,7 @@ export default function Footer() {
                   lineHeight: 1,
                 }}
               >
-                <span style={{ color: "var(--cyan-bright, #22d3ee)" }}>HKH</span>
-                <span style={{ fontSize: 16, color: "rgba(255,255,255,0.3)", marginLeft: 4 }}>™</span>
+                Smokers <span style={{ color: "var(--sv-red-bright, #ff3b4e)" }}>Vine</span>
               </div>
 
               <p style={{
@@ -241,7 +194,7 @@ export default function Footer() {
                 maxWidth: 240,
                 marginBottom: 28,
               }}>
-                Premium hookah experiences, curated flavours, and luxury rentals — wherever the vibe takes you.
+                Professional hookah service, premium flavours, and pot sales & rentals. Feel the vibe.
               </p>
 
               {/* Social links */}
@@ -336,7 +289,7 @@ export default function Footer() {
               {/* Contact info */}
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 32 }}>
                 <a
-                  href="mailto:hello@hkh.co"
+                  href="https://wa.me/254746621663"
                   style={{
                     fontFamily: "var(--font-mono)",
                     fontSize: 12,
@@ -346,26 +299,10 @@ export default function Footer() {
                     padding: "4px 0",
                     transition: "color 0.2s",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--cyan-bright)")}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--sv-red-bright)")}
                   onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.45)")}
                 >
-                  hello@hkh.co
-                </a>
-                <a
-                  href="tel:+254700000000"
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 12,
-                    color: "rgba(255,255,255,0.45)",
-                    textDecoration: "none",
-                    letterSpacing: "0.05em",
-                    padding: "4px 0",
-                    transition: "color 0.2s",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--cyan-bright)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.45)")}
-                >
-                  +254 700 000 000
+                  0746 621 663
                 </a>
                 <p style={{
                   fontFamily: "var(--font-mono)",
@@ -378,8 +315,8 @@ export default function Footer() {
                 </p>
               </div>
 
-              {/* Newsletter */}
-              <NewsletterForm />
+              {/* Policies */}
+              <PolicyNotice />
             </div>
           </div>
 
@@ -406,7 +343,7 @@ export default function Footer() {
               letterSpacing: "0.08em",
               margin: 0,
             }}>
-              © 2026 HKH™ · All rights reserved
+              © 2026 Smokers Vine · All rights reserved
             </p>
 
             <p style={{

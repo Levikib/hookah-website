@@ -1,7 +1,7 @@
 "use client";
+import { useState } from "react";
 import { useStore } from "@/store/useStore";
-import { SESSIONS } from "@/data/sessions";
-import { FLAVOURS } from "@/data/flavours";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
 
 function kes(amount: number) {
   return `KES ${amount.toLocaleString("en-KE")}`;
@@ -15,7 +15,66 @@ export default function CartDrawer() {
   const removeFromCart = useStore((s) => s.removeFromCart);
   const updateQuantity = useStore((s) => s.updateQuantity);
   const clearCart = useStore((s) => s.clearCart);
-  const { setBookingOpen, setBookingSession, setBookingStep, setBookingFlavours } = useStore();
+  const { setBookingOpen } = useStore();
+
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // Cart is "products only" when it holds no service — those go through
+  // the full booking flow instead (BookingModal handles date/time/etc.)
+  const hasService = cart.some((c) => c.type === "service");
+
+  const handleWhatsAppCheckout = async () => {
+    if (!name.trim() || !phone.trim()) {
+      setError("Please enter your name and phone number.");
+      return;
+    }
+    setError("");
+    setLoading(true);
+
+    const payload = {
+      items: cart.map((c) => ({ name: c.name, type: c.type, price: c.price, quantity: c.quantity })),
+      totalKes: cartTotal,
+      deliveryAddress: address.trim() || undefined,
+    };
+
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          phone: phone.trim(),
+          type: "order",
+          payload,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Something went wrong. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      const summaryLines = [
+        "New order — Smokers Vine",
+        `Name: ${name.trim()}`,
+        ...cart.map((c) => `${c.quantity}x ${c.name} — ${kes(c.price * c.quantity)}`),
+        `Total (est.): ${kes(cartTotal)}`,
+        address.trim() ? `Delivery address: ${address.trim()}` : "Delivery: to confirm",
+        "Delivery via boda boda · full payment before dispatch",
+      ];
+      window.location.href = buildWhatsAppLink(summaryLines);
+      clearCart();
+    } catch {
+      setError("Network error. Please check your connection and try again.");
+      setLoading(false);
+    }
+  };
 
   if (!cartOpen) return null;
 
@@ -70,13 +129,13 @@ export default function CartDrawer() {
                 lineHeight: 1,
               }}
             >
-              Your Session
+              Your Cart
             </h2>
             <p
               style={{
                 fontFamily: "var(--font-mono)",
                 fontSize: 10,
-                color: "var(--teal)",
+                color: "var(--sv-red-bright)",
                 letterSpacing: "0.1em",
                 marginTop: 4,
               }}
@@ -128,7 +187,7 @@ export default function CartDrawer() {
                   textAlign: "center",
                 }}
               >
-                Your session cart is empty.
+                Your cart is empty.
                 <br />Add flavours to get started.
               </p>
             </div>
@@ -299,35 +358,76 @@ export default function CartDrawer() {
               </span>
             </div>
 
-            <button
-              onClick={() => {
-                // Reconstruct booking state from cart items before opening modal
-                const sessionItem = cart.find(c => c.type === "session");
-                const matched = sessionItem
-                  ? SESSIONS.find(s => sessionItem.id.includes(s.id)) ?? null
-                  : null;
-                if (matched) {
-                  setBookingSession(matched);
-                  setBookingStep(2); // skip session picker — already have one
-                } else {
-                  setBookingStep(1); // no session in cart → must pick one first
-                }
-                const flavourItems = cart.filter(c => c.type === "flavour");
-                if (flavourItems.length > 0) {
-                  const flavours = flavourItems.map(item => {
-                    const id = parseInt(item.id.replace(/.*-/, ""));
-                    return FLAVOURS.find(f => f.id === id);
-                  }).filter(Boolean) as typeof FLAVOURS;
-                  if (flavours.length > 0) setBookingFlavours(flavours);
-                }
-                setCartOpen(false);
-                setBookingOpen(true);
-              }}
-              className="btn-teal"
-              style={{ width: "100%", fontSize: 15, marginBottom: 10, minHeight: 44 }}
-            >
-              Book This Session →
-            </button>
+            {hasService ? (
+              <button
+                onClick={() => {
+                  setCartOpen(false);
+                  setBookingOpen(true);
+                }}
+                className="btn-teal"
+                style={{ width: "100%", fontSize: 15, marginBottom: 10, minHeight: 44 }}
+              >
+                Continue Booking →
+              </button>
+            ) : checkoutOpen ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 10 }}>
+                <input
+                  type="text"
+                  placeholder="Full name *"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  style={{
+                    width: "100%", minHeight: 44, background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8,
+                    padding: "11px 14px", fontFamily: "var(--font-barlow)", fontSize: 14,
+                    color: "#fff", outline: "none",
+                  }}
+                />
+                <input
+                  type="tel"
+                  placeholder="Phone number *"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  style={{
+                    width: "100%", minHeight: 44, background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8,
+                    padding: "11px 14px", fontFamily: "var(--font-barlow)", fontSize: 14,
+                    color: "#fff", outline: "none",
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Delivery address (boda boda only)"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  style={{
+                    width: "100%", minHeight: 44, background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8,
+                    padding: "11px 14px", fontFamily: "var(--font-barlow)", fontSize: 14,
+                    color: "#fff", outline: "none",
+                  }}
+                />
+                {error && (
+                  <p style={{ fontFamily: "var(--font-barlow)", fontSize: 12, color: "#ff6b6b" }}>{error}</p>
+                )}
+                <button
+                  onClick={handleWhatsAppCheckout}
+                  disabled={loading}
+                  className="btn-teal"
+                  style={{ width: "100%", fontSize: 14, minHeight: 44, opacity: loading ? 0.7 : 1 }}
+                >
+                  {loading ? "Sending…" : "Send to WhatsApp →"}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setCheckoutOpen(true)}
+                className="btn-teal"
+                style={{ width: "100%", fontSize: 15, marginBottom: 10, minHeight: 44 }}
+              >
+                Checkout via WhatsApp →
+              </button>
+            )}
 
             <button
               onClick={clearCart}

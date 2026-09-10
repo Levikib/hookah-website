@@ -1,26 +1,15 @@
 "use client";
 import { useState, useCallback } from "react";
 import { useStore } from "@/store/useStore";
-import { SESSIONS } from "@/data/sessions";
+import { SERVICES } from "@/data/services";
 import { FLAVOURS } from "@/data/flavours";
 import type { Flavour } from "@/data/flavours";
 import { useIsMobile } from "@/context/MobileContext";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
 
 function kes(amount: number) {
   return `KES ${amount.toLocaleString("en-KE")}`;
 }
-
-// ── Session emoji map ────────────────────────────────────────────────────────
-const SESSION_EMOJI: Record<string, string> = {
-  solo:      "🌙",
-  duo:       "🔥",
-  squad:     "⚡",
-  vip:       "👑",
-  rooftop:   "🏙️",
-  corporate: "🤝",
-  wedding:   "💍",
-  custom:    "🎨",
-};
 
 // ── Time slots ───────────────────────────────────────────────────────────────
 const TIME_SLOTS = [
@@ -29,10 +18,6 @@ const TIME_SLOTS = [
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-function genRef(): string {
-  return "HKH-" + Math.floor(100000 + Math.random() * 900000).toString();
-}
-
 function daysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
 }
@@ -53,7 +38,7 @@ function displayDate(s: string) {
 
 // ── Step Indicator ───────────────────────────────────────────────────────────
 function StepIndicator({ step }: { step: number }) {
-  const labels = ["Session", "Date & Time", "Flavours", "Review"];
+  const labels = ["Occasion", "Date & Time", "Flavours", "Review"];
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginBottom: 24 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
@@ -83,7 +68,7 @@ function StepIndicator({ step }: { step: number }) {
                   fontSize: 12,
                   fontWeight: 700,
                   transition: "all 0.3s ease",
-                  background:   isCompleted ? "var(--violet)"  : isActive ? "var(--cyan)" : "transparent",
+                  background:   isCompleted ? "var(--violet)"  : isActive ? "var(--sv-red-bright)" : "transparent",
                   border:       isFuture    ? "2px solid rgba(255,255,255,0.2)" : "none",
                   color:        isCompleted || isActive ? "#05030a" : "rgba(255,255,255,0.35)",
                   boxShadow:    isActive ? "0 0 16px rgba(6,182,212,0.6)" : "none",
@@ -118,10 +103,10 @@ function StepIndicator({ step }: { step: number }) {
   );
 }
 
-// ── STEP 1: Session Selection ────────────────────────────────────────────────
-function Step1Session({ isMobile }: { isMobile: boolean }) {
-  const { booking, setBookingSession } = useStore();
-  const selected = booking.session;
+// ── STEP 1: Service Selection ────────────────────────────────────────────────
+function Step1Service({ isMobile }: { isMobile: boolean }) {
+  const { booking, setBookingService } = useStore();
+  const selected = booking.service;
 
   return (
     <div>
@@ -132,10 +117,10 @@ function Step1Session({ isMobile }: { isMobile: boolean }) {
         color: "var(--text-primary)",
         marginBottom: 8,
       }}>
-        Choose Your Session
+        Choose Your Occasion
       </h2>
       <p style={{ fontFamily: "var(--font-barlow)", fontSize: 14, color: "var(--text-muted)", marginBottom: 24 }}>
-        Pick the experience that fits your crew and occasion.
+        What are we setting up for?
       </p>
 
       <div style={{
@@ -143,22 +128,22 @@ function Step1Session({ isMobile }: { isMobile: boolean }) {
         gridTemplateColumns: isMobile ? "repeat(1, 1fr)" : "repeat(auto-fill, minmax(220px, 1fr))",
         gap: 14,
       }}>
-        {SESSIONS.map((s) => {
+        {SERVICES.map((s) => {
           const isSelected = selected?.id === s.id;
           return (
             <button
               key={s.id}
-              onClick={() => setBookingSession(s)}
+              onClick={() => setBookingService(s)}
               style={{
-                background: isSelected ? "rgba(6,182,212,0.12)" : "rgba(255,255,255,0.04)",
-                border: `2px solid ${isSelected ? "var(--cyan)" : "rgba(255,255,255,0.1)"}`,
+                background: isSelected ? "rgba(225,29,46,0.12)" : "rgba(255,255,255,0.04)",
+                border: `2px solid ${isSelected ? "var(--sv-red-bright)" : "rgba(255,255,255,0.1)"}`,
                 borderRadius: 14,
                 padding: "18px 16px",
                 textAlign: "left",
                 cursor: "none",
                 transition: "all 0.2s ease",
                 position: "relative",
-                boxShadow: isSelected ? "0 0 20px rgba(6,182,212,0.25)" : "none",
+                boxShadow: isSelected ? "0 0 20px rgba(225,29,46,0.25)" : "none",
               }}
             >
               {s.popular && (
@@ -178,12 +163,12 @@ function Step1Session({ isMobile }: { isMobile: boolean }) {
                   Popular
                 </div>
               )}
-              <div style={{ fontSize: 28, marginBottom: 8 }}>{SESSION_EMOJI[s.id] ?? "🎯"}</div>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>{s.emoji}</div>
               <div style={{
                 fontFamily: "var(--font-bebas)",
                 fontSize: 20,
                 letterSpacing: "0.04em",
-                color: isSelected ? "var(--cyan)" : "var(--text-primary)",
+                color: isSelected ? "var(--sv-red-bright)" : "var(--text-primary)",
                 marginBottom: 4,
               }}>
                 {s.name}
@@ -197,24 +182,6 @@ function Step1Session({ isMobile }: { isMobile: boolean }) {
               }}>
                 {s.tagline}
               </div>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <span style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 10,
-                  color: "var(--text-dim)",
-                  letterSpacing: "0.1em",
-                }}>
-                  ⏱ {s.duration}
-                </span>
-                <span style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 10,
-                  color: "var(--text-dim)",
-                  letterSpacing: "0.1em",
-                }}>
-                  👥 {s.people}
-                </span>
-              </div>
               <div style={{
                 marginTop: 12,
                 fontFamily: "var(--font-mono)",
@@ -222,7 +189,7 @@ function Step1Session({ isMobile }: { isMobile: boolean }) {
                 fontWeight: 700,
                 color: s.isCustom ? "var(--orange)" : "var(--gold)",
               }}>
-                {s.isCustom ? "Custom" : kes(s.price)}
+                {s.isCustom ? "Custom" : `${s.priceEstimated ? "Est. from " : "From "}${kes(s.startingPrice)}`}
               </div>
             </button>
           );
@@ -288,7 +255,7 @@ function Step2DateTime({ isMobile }: { isMobile: boolean }) {
         Date, Time & Location
       </h2>
       <p style={{ fontFamily: "var(--font-barlow)", fontSize: 14, color: "var(--text-muted)", marginBottom: 28 }}>
-        Choose when and where the session happens.
+        Choose when and where it happens.
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 24 }}>
@@ -368,7 +335,7 @@ function Step2DateTime({ isMobile }: { isMobile: boolean }) {
                   disabled={isPast}
                   style={{
                     background: isSelected
-                      ? "var(--cyan)"
+                      ? "var(--sv-red-bright)"
                       : isPast
                       ? "transparent"
                       : "rgba(255,255,255,0.04)",
@@ -400,7 +367,7 @@ function Step2DateTime({ isMobile }: { isMobile: boolean }) {
               marginTop: 14,
               fontFamily: "var(--font-barlow)",
               fontSize: 12,
-              color: "var(--cyan)",
+              color: "var(--sv-red-bright)",
               textAlign: "center",
             }}>
               {displayDate(selectedDate)}
@@ -436,8 +403,8 @@ function Step2DateTime({ isMobile }: { isMobile: boolean }) {
                     key={slot}
                     onClick={() => setBookingTime(slot)}
                     style={{
-                      background: isActive ? "var(--cyan)" : "rgba(255,255,255,0.05)",
-                      border: `1px solid ${isActive ? "var(--cyan)" : "rgba(255,255,255,0.12)"}`,
+                      background: isActive ? "var(--sv-red-bright)" : "rgba(255,255,255,0.05)",
+                      border: `1px solid ${isActive ? "var(--sv-red-bright)" : "rgba(255,255,255,0.12)"}`,
                       borderRadius: 999,
                       color: isActive ? "#05030a" : "var(--text-primary)",
                       fontFamily: "var(--font-mono)",
@@ -483,9 +450,9 @@ function Step2DateTime({ isMobile }: { isMobile: boolean }) {
                       flex: 1,
                       padding: "12px 0",
                       background: isActive ? "rgba(6,182,212,0.15)" : "rgba(255,255,255,0.04)",
-                      border: `2px solid ${isActive ? "var(--cyan)" : "rgba(255,255,255,0.1)"}`,
+                      border: `2px solid ${isActive ? "var(--sv-red-bright)" : "rgba(255,255,255,0.1)"}`,
                       borderRadius: 12,
-                      color: isActive ? "var(--cyan)" : "var(--text-muted)",
+                      color: isActive ? "var(--sv-red-bright)" : "var(--text-muted)",
                       fontFamily: "var(--font-barlow)",
                       fontWeight: 700,
                       fontSize: 12,
@@ -532,15 +499,7 @@ function Step2DateTime({ isMobile }: { isMobile: boolean }) {
 // ── STEP 3: Flavour Selection ────────────────────────────────────────────────
 function Step3Flavours({ isMobile }: { isMobile: boolean }) {
   const { booking, toggleFlavour } = useStore();
-  const session = booking.session;
-
-  const maxFlavours = session
-    ? session.isCustom
-      ? 3
-      : typeof session.people === "number"
-      ? session.people
-      : 3
-    : 3;
+  const maxFlavours: number = 4;
 
   const selected = booking.selectedFlavours;
 
@@ -562,12 +521,12 @@ function Step3Flavours({ isMobile }: { isMobile: boolean }) {
         marginBottom: 24,
       }}>
         <p style={{ fontFamily: "var(--font-barlow)", fontSize: 14, color: "var(--text-muted)" }}>
-          Select up to {maxFlavours} flavour{maxFlavours !== 1 ? "s" : ""} for your session.
+          Select up to {maxFlavours} flavour{maxFlavours !== 1 ? "s" : ""} for the occasion.
         </p>
         <div style={{
           fontFamily: "var(--font-mono)",
           fontSize: 12,
-          color: selected.length >= maxFlavours ? "var(--cyan)" : "var(--text-muted)",
+          color: selected.length >= maxFlavours ? "var(--sv-red-bright)" : "var(--text-muted)",
           background: "rgba(255,255,255,0.05)",
           border: `1px solid ${selected.length >= maxFlavours ? "rgba(6,182,212,0.4)" : "rgba(255,255,255,0.1)"}`,
           borderRadius: 999,
@@ -597,7 +556,7 @@ function Step3Flavours({ isMobile }: { isMobile: boolean }) {
               style={{
                 position: "relative",
                 background: isSelected ? "rgba(6,182,212,0.12)" : "rgba(255,255,255,0.04)",
-                border: `2px solid ${isSelected ? "var(--cyan)" : "rgba(255,255,255,0.08)"}`,
+                border: `2px solid ${isSelected ? "var(--sv-red-bright)" : "rgba(255,255,255,0.08)"}`,
                 borderRadius: 12,
                 padding: "14px 12px",
                 textAlign: "left",
@@ -614,7 +573,7 @@ function Step3Flavours({ isMobile }: { isMobile: boolean }) {
                   right: 8,
                   width: 18,
                   height: 18,
-                  background: "var(--cyan)",
+                  background: "var(--sv-red-bright)",
                   borderRadius: "50%",
                   display: "flex",
                   alignItems: "center",
@@ -629,7 +588,7 @@ function Step3Flavours({ isMobile }: { isMobile: boolean }) {
                 fontFamily: "var(--font-barlow)",
                 fontWeight: 700,
                 fontSize: 13,
-                color: isSelected ? "var(--cyan)" : "var(--text-primary)",
+                color: isSelected ? "var(--sv-red-bright)" : "var(--text-primary)",
                 marginBottom: 3,
                 lineHeight: 1.2,
               }}>
@@ -662,37 +621,27 @@ function Step3Flavours({ isMobile }: { isMobile: boolean }) {
 
 // ── STEP 4: Review & Confirm ─────────────────────────────────────────────────
 function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void; isMobile: boolean }) {
-  const { booking, setPromoCode } = useStore();
+  const { booking } = useStore();
 
-  const { session, date, timeSlot, location, deliveryAddress, selectedFlavours, promoCode } = booking;
+  const { service, date, timeSlot, location, deliveryAddress, selectedFlavours } = booking;
 
   const deliveryFee = location === "delivery" ? 2000 : 0;
-  const sessionPrice = session?.isCustom ? 0 : (session?.price ?? 0);
+  const servicePrice = service?.isCustom ? 0 : (service?.startingPrice ?? 0);
   const flavourTotal = selectedFlavours.reduce((s, f) => s + f.price, 0);
-  const total = sessionPrice + flavourTotal + deliveryFee;
+  const total = servicePrice + flavourTotal + deliveryFee;
 
-  const [promoInput, setPromoInput] = useState(promoCode);
   const [customerName, setCustomerName] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleApplyPromo = () => {
-    setPromoCode(promoInput.trim());
-  };
-
   const handleConfirm = async () => {
-    if (!customerName.trim() || !customerEmail.trim()) {
-      setError("Please enter your name and email.");
+    if (!customerName.trim() || !customerPhone.trim()) {
+      setError("Please enter your name and phone number.");
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
-      setError("Please enter a valid email address.");
-      return;
-    }
-    if (!session) {
-      setError("No session selected. Please go back and choose a session.");
+    if (!service) {
+      setError("No occasion selected. Please go back and choose one.");
       return;
     }
     if (!date) {
@@ -705,33 +654,48 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
     }
     setError("");
     setLoading(true);
+
+    const payload = {
+      serviceId: service.id,
+      serviceName: service.name,
+      bookingDate: date,
+      timeSlot,
+      location,
+      deliveryAddress: location === "delivery" ? deliveryAddress : undefined,
+      flavours: selectedFlavours.map(f => ({ flavourId: f.id, name: f.name })),
+      estimatedTotalKes: service.isCustom ? null : total,
+    };
+
     try {
-      const res = await fetch("/api/paystack/initialize", {
+      const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: customerEmail.trim(),
-          amount: total,
-          bookingData: {
-            name: customerName.trim(),
-            phone: customerPhone.trim() || undefined,
-            sessionId: session.id,
-            sessionName: session.name,
-            bookingDate: date,
-            timeSlot: timeSlot,
-            flavours: selectedFlavours.map(f => ({ flavourId: f.id, quantity: 1 })),
-            notes: `Location: ${location}${location === "delivery" ? ` — ${deliveryAddress}` : ""}`,
-          },
+          name: customerName.trim(),
+          phone: customerPhone.trim(),
+          type: "booking",
+          payload,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Payment failed. Please try again.");
+        setError(data.error ?? "Something went wrong. Please try again.");
         setLoading(false);
         return;
       }
-      // Redirect to Paystack checkout
-      window.location.href = data.authorization_url;
+
+      const summaryLines = [
+        `New booking request — Smokers Vine`,
+        `Name: ${customerName.trim()}`,
+        `Occasion: ${service.name}`,
+        `Date: ${displayDate(date)}`,
+        `Time: ${timeSlot}`,
+        `Location: ${location === "delivery" ? `Delivery — ${deliveryAddress}` : "In-venue"}`,
+        selectedFlavours.length > 0 ? `Flavours: ${selectedFlavours.map(f => f.name).join(", ")}` : "",
+        service.isCustom ? "Pricing: custom — please quote" : `Estimated total: ${kes(total)} (est.)`,
+      ];
+      window.location.href = buildWhatsAppLink(summaryLines);
+      onConfirm(data.id);
     } catch {
       setError("Network error. Please check your connection and try again.");
       setLoading(false);
@@ -756,7 +720,7 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
         {/* ── Left: Order details ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Session block */}
+          {/* Occasion block */}
           <div style={{
             background: "rgba(255,255,255,0.04)",
             border: "1px solid rgba(255,255,255,0.08)",
@@ -764,16 +728,16 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
             padding: "16px 18px",
           }}>
             <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.2em", color: "var(--text-dim)", textTransform: "uppercase", marginBottom: 8 }}>
-              Session
+              Occasion
             </p>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 22 }}>{session ? SESSION_EMOJI[session.id] : "—"}</span>
+              <span style={{ fontSize: 22 }}>{service?.emoji ?? "—"}</span>
               <div>
                 <p style={{ fontFamily: "var(--font-bebas)", fontSize: 18, letterSpacing: "0.04em", color: "var(--text-primary)" }}>
-                  {session?.name ?? "—"}
+                  {service?.name ?? "—"}
                 </p>
                 <p style={{ fontFamily: "var(--font-barlow)", fontSize: 12, color: "var(--text-muted)" }}>
-                  {session?.duration} · {session?.people} {typeof session?.people === "number" ? "people" : ""}
+                  {service?.tagline}
                 </p>
               </div>
             </div>
@@ -792,7 +756,7 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
             <p style={{ fontFamily: "var(--font-barlow)", fontWeight: 600, fontSize: 14, color: "var(--text-primary)" }}>
               {date ? displayDate(date) : "—"}
             </p>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--cyan)" }}>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--sv-red-bright)" }}>
               {timeSlot ?? "—"}
             </p>
           </div>
@@ -857,14 +821,14 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
               Price Breakdown
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <PriceLine label={session?.name ?? "Session"} value={session?.isCustom ? "Custom" : kes(sessionPrice)} />
+              <PriceLine label={service?.name ?? "Occasion"} value={service?.isCustom ? "Custom" : kes(servicePrice)} />
               {selectedFlavours.map((f) => (
                 <PriceLine key={f.id} label={`${f.emoji} ${f.name}`} value={kes(f.price)} muted />
               ))}
               {deliveryFee > 0 && <PriceLine label="Delivery Fee" value={kes(deliveryFee)} muted />}
               <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "4px 0" }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontFamily: "var(--font-barlow)", fontWeight: 700, fontSize: 15, color: "var(--text-primary)" }}>Total</span>
+                <span style={{ fontFamily: "var(--font-barlow)", fontWeight: 700, fontSize: 15, color: "var(--text-primary)" }}>Estimated Total</span>
                 <span style={{
                   fontFamily: "var(--font-mono)",
                   fontSize: 24,
@@ -872,54 +836,15 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
                   color: "var(--gold)",
                   textShadow: "0 0 20px rgba(245,158,11,0.5)",
                 }}>
-                  {session?.isCustom ? "TBD" : kes(total)}
+                  {service?.isCustom ? "TBD" : kes(total)}
                 </span>
               </div>
+              {!service?.isCustom && (
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-dim)" }}>
+                  Estimate only — final price confirmed on WhatsApp.
+                </p>
+              )}
             </div>
-          </div>
-
-          {/* Promo code */}
-          <div style={{
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: 12,
-            padding: "16px 18px",
-          }}>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.2em", color: "var(--text-dim)", textTransform: "uppercase", marginBottom: 12 }}>
-              Promo Code
-            </p>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input
-                type="text"
-                placeholder="Enter code…"
-                value={promoInput}
-                onChange={(e) => setPromoInput(e.target.value)}
-                style={{
-                  flex: 1,
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  borderRadius: 8,
-                  padding: "10px 12px",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 13,
-                  color: "var(--text-primary)",
-                  outline: "none",
-                  letterSpacing: "0.1em",
-                }}
-              />
-              <button
-                onClick={handleApplyPromo}
-                className="btn-ghost"
-                style={{ padding: "10px 16px", fontSize: 12 }}
-              >
-                Apply
-              </button>
-            </div>
-            {booking.promoCode && (
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--cyan)", marginTop: 8 }}>
-                Code &quot;{booking.promoCode}&quot; applied ✓
-              </p>
-            )}
           </div>
 
           {/* Customer details */}
@@ -937,8 +862,7 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
             </p>
             {[
               { placeholder: "Full name *", value: customerName, onChange: setCustomerName, type: "text" },
-              { placeholder: "Email address *", value: customerEmail, onChange: setCustomerEmail, type: "email" },
-              { placeholder: "Phone (optional)", value: customerPhone, onChange: setCustomerPhone, type: "tel" },
+              { placeholder: "Phone number *", value: customerPhone, onChange: setCustomerPhone, type: "tel" },
             ].map(({ placeholder, value, onChange, type }) => (
               <input
                 key={placeholder}
@@ -976,7 +900,7 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
           {/* Confirm button */}
           <button
             onClick={handleConfirm}
-            disabled={loading || session?.isCustom}
+            disabled={loading}
             className="btn-teal"
             style={{
               width: "100%",
@@ -989,7 +913,7 @@ function Step4Review({ onConfirm, isMobile }: { onConfirm: (ref: string) => void
               opacity: loading ? 0.7 : 1,
             }}
           >
-            {loading ? "Redirecting to payment…" : session?.isCustom ? "We'll contact you to quote" : `Confirm & Pay ${kes(total)}`}
+            {loading ? "Sending to WhatsApp…" : "Confirm on WhatsApp →"}
           </button>
         </div>
       </div>
@@ -1054,13 +978,13 @@ function ConfirmationScreen({ refNum }: { refNum: string }) {
         color: "var(--text-muted)",
         marginBottom: 8,
       }}>
-        Your session is locked in. We&apos;ll see you there.
+        We&apos;ve got your details. Continue the conversation on WhatsApp to lock it in.
       </p>
       <div style={{
         fontFamily: "var(--font-mono)",
         fontSize: 22,
         letterSpacing: "0.2em",
-        color: "var(--cyan)",
+        color: "var(--sv-red-bright)",
         background: "rgba(6,182,212,0.1)",
         border: "1px solid rgba(6,182,212,0.3)",
         borderRadius: 10,
@@ -1096,8 +1020,8 @@ export default function BookingModal() {
   const [refNum, setRefNum] = useState("");
   const isMobile = useIsMobile();
 
-  // Safety: if session not set but step > 1, clamp to step 1
-  const step = (!booking.session && booking.step > 1) ? 1 : booking.step;
+  // Safety: if service not set but step > 1, clamp to step 1
+  const step = (!booking.service && booking.step > 1) ? 1 : booking.step;
 
   if (!bookingOpen) return null;
 
@@ -1115,10 +1039,10 @@ export default function BookingModal() {
 
   // Step validation
   const canGoNext = (() => {
-    if (step === 1) return !!booking.session;
+    if (step === 1) return !!booking.service;
     if (step === 2) return !!booking.date && !!booking.timeSlot;
-    // Step 3→4: require session + date + time to be set (flavours are optional)
-    if (step === 3) return !!booking.session && !!booking.date && !!booking.timeSlot;
+    // Step 3→4: require service + date + time to be set (flavours are optional)
+    if (step === 3) return !!booking.service && !!booking.date && !!booking.timeSlot;
     return false;
   })();
 
@@ -1131,7 +1055,7 @@ export default function BookingModal() {
   };
 
   const STEP_LABELS: Record<number, string> = {
-    1: "Choose Your Session",
+    1: "Choose Your Occasion",
     2: "Date, Time & Location",
     3: "Pick Flavours",
     4: "Review & Confirm",
@@ -1249,7 +1173,7 @@ export default function BookingModal() {
 
               {/* Step content */}
               <div style={{ minHeight: 320 }}>
-                {step === 1 && <Step1Session isMobile={isMobile} />}
+                {step === 1 && <Step1Service isMobile={isMobile} />}
                 {step === 2 && <Step2DateTime isMobile={isMobile} />}
                 {step === 3 && <Step3Flavours isMobile={isMobile} />}
                 {step === 4 && <Step4Review onConfirm={handleConfirm} isMobile={isMobile} />}
@@ -1311,7 +1235,7 @@ export default function BookingModal() {
                   color: "rgba(255,180,100,0.7)", textAlign: "center",
                   marginTop: 8,
                 }}>
-                  {!booking.session ? "← Go back and choose a session first" : "← Go back and pick a date & time"}
+                  {!booking.service ? "← Go back and choose an occasion first" : "← Go back and pick a date & time"}
                 </p>
               )}
             </>

@@ -1,11 +1,11 @@
 import { create } from "zustand";
 import type { Flavour } from "@/data/flavours";
-import type { SessionTier } from "@/data/sessions";
+import type { ServiceTier } from "@/data/services";
 import type { RentalModel } from "@/data/rentals";
 
 export interface CartItem {
   id: string;
-  type: "flavour" | "rental" | "session" | "addon";
+  type: "flavour" | "rental" | "service" | "addon";
   name: string;
   price: number;
   quantity: number;
@@ -14,7 +14,7 @@ export interface CartItem {
 
 export interface BookingState {
   step: 1 | 2 | 3 | 4;
-  session: SessionTier | null;
+  service: ServiceTier | null;
   selectedHookah: RentalModel | null;
   date: string | null;
   timeSlot: string | null;
@@ -40,7 +40,7 @@ interface Store {
   // Booking
   booking: BookingState;
   setBookingStep: (step: 1 | 2 | 3 | 4) => void;
-  setBookingSession: (session: SessionTier | null) => void;
+  setBookingService: (service: ServiceTier | null) => void;
   setBookingHookah: (hookah: RentalModel | null) => void;
   setBookingDate: (date: string | null) => void;
   setBookingTime: (slot: string | null) => void;
@@ -60,7 +60,7 @@ interface Store {
 
 const defaultBooking: BookingState = {
   step: 1,
-  session: null,
+  service: null,
   selectedHookah: null,
   date: null,
   timeSlot: null,
@@ -96,7 +96,7 @@ export const useStore = create<Store>((set, get) => ({
   // Booking
   booking: defaultBooking,
   setBookingStep: (step) => set((s) => ({ booking: { ...s.booking, step } })),
-  setBookingSession: (session) => set((s) => ({ booking: { ...s.booking, session } })),
+  setBookingService: (service) => set((s) => ({ booking: { ...s.booking, service } })),
   setBookingHookah: (selectedHookah) => set((s) => ({ booking: { ...s.booking, selectedHookah } })),
   setBookingDate: (date) => set((s) => ({ booking: { ...s.booking, date, timeSlot: null } })),
   setBookingTime: (timeSlot) => set((s) => ({ booking: { ...s.booking, timeSlot } })),
