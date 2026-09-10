@@ -19,6 +19,12 @@ function calcPrice(base: number, size: Size): number {
 }
 function kes(n: number) { return `KES ${n.toLocaleString("en-KE")}`; }
 
+const CATEGORY_BANNER: Record<string, string> = {
+  "Mint Family": "/images/flavours/mint-family.jpg",
+  "Signature": "/images/flavours/signature.jpg",
+  "Tropical": "/images/flavours/tropical.jpg",
+};
+
 // ── Est. badge — visible flag for placeholder pricing ─────────────────────
 function EstBadge() {
   return (
@@ -366,14 +372,14 @@ export default function FlavourRows() {
       </div>
 
       {filteredFlat ? (
-        <CardRow title={activeCategory}>
+        <CardRow title={activeCategory} bannerImage={CATEGORY_BANNER[activeCategory]}>
           {filteredFlat.map((f) => (
             <FlavourCard key={f.id} flavour={f} onOpen={() => setDetail(f)} />
           ))}
         </CardRow>
       ) : (
         grouped.map(({ category, items }) => (
-          <CardRow key={category} title={category} onViewAll={() => setActiveCategory(category)}>
+          <CardRow key={category} title={category} onViewAll={() => setActiveCategory(category)} bannerImage={CATEGORY_BANNER[category]}>
             {items.map((f) => (
               <FlavourCard key={f.id} flavour={f} onOpen={() => setDetail(f)} />
             ))}

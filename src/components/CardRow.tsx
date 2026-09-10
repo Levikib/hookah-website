@@ -6,11 +6,12 @@ interface CardRowProps {
   subtitle?: string;
   children: ReactNode;
   onViewAll?: () => void;
+  bannerImage?: string;
 }
 
 // Netflix/DSTV-style horizontal scroll row. Reused by flavour and rental
 // sections so the scroll/arrow logic lives in exactly one place.
-export default function CardRow({ title, subtitle, children, onViewAll }: CardRowProps) {
+export default function CardRow({ title, subtitle, children, onViewAll, bannerImage }: CardRowProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -33,30 +34,51 @@ export default function CardRow({ title, subtitle, children, onViewAll }: CardRo
     <div style={{ marginBottom: 40 }}>
       <div style={{
         display: "flex",
-        alignItems: "baseline",
+        alignItems: "flex-end",
         justifyContent: "space-between",
         padding: "0 5vw",
         marginBottom: 14,
+        gap: 16,
       }}>
-        <div>
-          <h3 style={{
-            fontFamily: "var(--font-bebas)",
-            fontSize: "clamp(20px, 3vw, 28px)",
-            letterSpacing: "0.04em",
-            color: "var(--text-primary)",
-          }}>
-            {title}
-          </h3>
-          {subtitle && (
-            <p style={{
-              fontFamily: "var(--font-barlow)",
-              fontSize: 13,
-              color: "var(--text-muted)",
-              marginTop: 2,
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {bannerImage && (
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: 12,
+              overflow: "hidden",
+              flexShrink: 0,
+              border: "1px solid rgba(255,255,255,0.12)",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
             }}>
-              {subtitle}
-            </p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={bannerImage}
+                alt=""
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              />
+            </div>
           )}
+          <div>
+            <h3 style={{
+              fontFamily: "var(--font-bebas)",
+              fontSize: "clamp(20px, 3vw, 28px)",
+              letterSpacing: "0.04em",
+              color: "var(--text-primary)",
+            }}>
+              {title}
+            </h3>
+            {subtitle && (
+              <p style={{
+                fontFamily: "var(--font-barlow)",
+                fontSize: 13,
+                color: "var(--text-muted)",
+                marginTop: 2,
+              }}>
+                {subtitle}
+              </p>
+            )}
+          </div>
         </div>
         {onViewAll && (
           <button

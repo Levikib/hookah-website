@@ -9,6 +9,11 @@ import { useIsMobile } from "@/context/MobileContext";
 
 function kes(n: number) { return `KES ${n.toLocaleString("en-KE")}`; }
 
+const POT_IMAGE: Record<string, string> = {
+  "premium-pot": "/images/rentals/premium-pot.jpg",
+  "duo-pot": "/images/rentals/duo-pot.jpg",
+};
+
 type Filter = "all" | "sale" | "rental";
 
 function matchesFilter(model: RentalModel, filter: Filter) {
@@ -106,6 +111,7 @@ function Spotlight({
 }) {
   const showSale = model.mode === "sale" || model.mode === "both";
   const showRental = model.mode === "rental" || model.mode === "both";
+  const image = POT_IMAGE[model.id];
 
   return (
     <div style={{
@@ -118,18 +124,40 @@ function Spotlight({
       margin: isMobile ? "0 0 24px" : "0 5vw 32px",
       background: "linear-gradient(180deg, var(--sv-charcoal) 0%, var(--sv-black) 100%)",
     }}>
-      {/* Radial glow spotlight — brand red */}
-      <div style={{
-        position: "absolute",
-        top: "50%", left: isMobile ? "50%" : "68%",
-        transform: "translate(-50%, -50%)",
-        width: isMobile ? 360 : 620,
-        height: isMobile ? 360 : 620,
-        borderRadius: "50%",
-        background: `radial-gradient(circle, ${model.accentColor}33 0%, ${model.accentColor}0d 45%, transparent 72%)`,
-        pointerEvents: "none",
-        transition: "background 0.5s ease",
-      }} />
+      {image ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={image}
+            alt={model.name}
+            style={{
+              position: "absolute", inset: 0,
+              width: "100%", height: "100%", objectFit: "cover",
+              opacity: 0.9,
+            }}
+          />
+          {/* Scrim for text legibility over the photo */}
+          <div style={{
+            position: "absolute", inset: 0,
+            background: isMobile
+              ? "linear-gradient(to top, rgba(5,3,10,0.95) 0%, rgba(5,3,10,0.55) 45%, rgba(5,3,10,0.15) 100%)"
+              : "linear-gradient(to right, rgba(5,3,10,0.95) 0%, rgba(5,3,10,0.55) 45%, rgba(5,3,10,0.05) 75%)",
+          }} />
+        </>
+      ) : (
+        /* Radial glow spotlight — brand red (fallback when no product photo) */
+        <div style={{
+          position: "absolute",
+          top: "50%", left: isMobile ? "50%" : "68%",
+          transform: "translate(-50%, -50%)",
+          width: isMobile ? 360 : 620,
+          height: isMobile ? 360 : 620,
+          borderRadius: "50%",
+          background: `radial-gradient(circle, ${model.accentColor}33 0%, ${model.accentColor}0d 45%, transparent 72%)`,
+          pointerEvents: "none",
+          transition: "background 0.5s ease",
+        }} />
+      )}
 
       {/* Content */}
       <div style={{
@@ -252,6 +280,7 @@ function Spotlight({
 
 // ─── Compact card for the row ───────────────────────────────────────────────
 function PotCard({ model, onClick }: { model: RentalModel; onClick: () => void }) {
+  const image = POT_IMAGE[model.id];
   return (
     <button
       onClick={onClick}
@@ -263,12 +292,22 @@ function PotCard({ model, onClick }: { model: RentalModel; onClick: () => void }
         background: "rgba(255,255,255,0.04)",
         border: `1px solid ${model.accentColor}33`,
         borderRadius: 14,
-        padding: "18px 16px",
+        padding: image ? 0 : "18px 16px",
         cursor: "pointer",
         scrollSnapAlign: "start",
         transition: "border-color 0.2s ease",
+        overflow: "hidden",
       }}
     >
+      {image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={image}
+          alt={model.name}
+          style={{ width: "100%", height: 140, objectFit: "cover", display: "block" }}
+        />
+      )}
+      <div style={{ padding: image ? "14px 16px 16px" : 0 }}>
       <div style={{
         display: "inline-block",
         fontFamily: "var(--font-mono)",
@@ -293,6 +332,7 @@ function PotCard({ model, onClick }: { model: RentalModel; onClick: () => void }
         {model.mode === "rental" ? kes(model.sessionRate) : kes(model.salePrice)}
         {model.priceEstimated && <EstBadge />}
       </p>
+      </div>
     </button>
   );
 }
